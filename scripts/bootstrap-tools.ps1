@@ -19,7 +19,14 @@ function Install-Archive {
   if (-not (Test-Path -LiteralPath $Archive)) {
     Invoke-WebRequest -Uri $Url -OutFile $Archive
   }
-  $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Archive).Hash.ToLowerInvariant()
+  $stream = [IO.File]::OpenRead($Archive)
+  try {
+    $hashAlgorithm = [Security.Cryptography.SHA256]::Create()
+    $actual = ([BitConverter]::ToString($hashAlgorithm.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    if ($hashAlgorithm) { $hashAlgorithm.Dispose() }
+    $stream.Dispose()
+  }
   if ($actual -ne $Sha256) { throw "Checksum mismatch for $Archive" }
   New-Item -ItemType Directory -Force -Path $Destination | Out-Null
   Expand-Archive -LiteralPath $Archive -DestinationPath $Destination -Force

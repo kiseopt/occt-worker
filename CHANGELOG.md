@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.1 - 2026-08-24
+
+### Fixed
+
+- Replaced unavailable `Get-FileHash` calls with .NET SHA-256 hashing in Windows bootstrap and release workflows.
+- Updated the official GitHub Actions to Node.js 24-based releases.
+
+### Changed
+
+- Rebuilt the release wasm and refreshed its recorded size and SHA-256 evidence.
+- Documented the non-fatal OCCT 8.0.1 deprecation warnings emitted during compilation.
+
 ## 1.0.0 - 2026-08-24
 
 Initial public release.

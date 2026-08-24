@@ -16,7 +16,14 @@ if (-not (Test-Path $executable -PathType Leaf)) {
       -Uri "https://github.com/bytecodealliance/wasmtime/releases/download/v$version/$archiveName" `
       -OutFile $archivePath
   }
-  $actualHash = (Get-FileHash $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  $stream = [IO.File]::OpenRead($archivePath)
+  try {
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    $actualHash = ([BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    if ($sha256) { $sha256.Dispose() }
+    $stream.Dispose()
+  }
   if ($actualHash -ne $expectedHash) {
     throw "Wasmtime archive hash mismatch: $actualHash"
   }

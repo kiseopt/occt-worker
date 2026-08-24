@@ -20,6 +20,8 @@ npm run build:wasm
 
 `bootstrap:sources` 会按上述 commit 获取源码，并拒绝覆盖不同版本的 checkout。Git checkout 也可以执行 `git submodule update --init --recursive`。Emscripten 会由构建脚本按固定版本安装和激活。
 
+固定版本的 OCCT 8.0.1 头文件已将内核使用的部分兼容 API 标记为弃用，因此当前构建会输出非致命编译警告，包括 `TopTools_IndexedMapOfShape`、`TopTools_ListOfShape`、`TColgp_*` 集合别名和 `Standard_Failure::GetMessageString()`。这些警告不会阻止 `npm run build:wasm` 完成，也不影响生成的 wasm 产物；它们表示在未来 OCCT 删除兼容 API 前需要迁移的源码位置。
+
 替换 `occt` 子模块为兼容的修改版 OCCT 8.0.1 后可以生成新的 `wasm/occt-worker.wasm`。发布者仍需提供适用的 OCCT 对应源码、项目源码、构建脚本和许可证材料；本文件是工程指引，不是法律意见。
 
 英文规范：[SOURCE.md](SOURCE.md)。

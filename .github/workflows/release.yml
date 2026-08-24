@@ -13,10 +13,10 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -48,8 +48,18 @@ jobs:
         shell: pwsh
         run: |
           git diff --exit-code -- wasm/occt-worker.wasm wasm/occt-worker.wasmtime.wasm docs/g0-build.json docs/wasmtime-build.json protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/generated.ts kernel/include/generated.hpp
-          $mainHash = (Get-FileHash wasm/occt-worker.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
-          $wasmtimeHash = (Get-FileHash wasm/occt-worker.wasmtime.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
+          $mainStream = [IO.File]::OpenRead('wasm/occt-worker.wasm')
+          $wasmtimeStream = [IO.File]::OpenRead('wasm/occt-worker.wasmtime.wasm')
+          try {
+            $sha256 = [Security.Cryptography.SHA256]::Create()
+            $mainHash = ([BitConverter]::ToString($sha256.ComputeHash($mainStream))).Replace('-', '').ToLowerInvariant()
+            $sha256.Initialize()
+            $wasmtimeHash = ([BitConverter]::ToString($sha256.ComputeHash($wasmtimeStream))).Replace('-', '').ToLowerInvariant()
+          } finally {
+            if ($sha256) { $sha256.Dispose() }
+            $mainStream.Dispose()
+            $wasmtimeStream.Dispose()
+          }
           "$mainHash  occt-worker.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasm.sha256
           "$wasmtimeHash  occt-worker.wasmtime.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasmtime.wasm.sha256
       - name: Create corresponding source archive
@@ -112,7 +122,14 @@ jobs:
           $sourceAsset = Join-Path $releaseAssets "$archiveBase.tar.gz"
           & tar -czf $sourceAsset -C $env:RUNNER_TEMP $archiveBase
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $sourceHash = (Get-FileHash $sourceAsset -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sourceStream = [IO.File]::OpenRead($sourceAsset)
+          try {
+            $sha256 = [Security.Cryptography.SHA256]::Create()
+            $sourceHash = ([BitConverter]::ToString($sha256.ComputeHash($sourceStream))).Replace('-', '').ToLowerInvariant()
+          } finally {
+            if ($sha256) { $sha256.Dispose() }
+            $sourceStream.Dispose()
+          }
           "$sourceHash  $archiveBase.tar.gz" | Set-Content -Encoding ascii "$sourceAsset.sha256"
       - run: npm publish --access public --provenance
         env:

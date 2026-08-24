@@ -1,12 +1,12 @@
 {
   "name": "occt-worker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "occt-worker",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "license": "SEE LICENSE IN LICENSES.md",
       "dependencies": {
         "draco3dgltf": "1.5.7",
