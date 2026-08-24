@@ -1,0 +1,41 @@
+build/
+.tools/
+dist/
+node_modules/
+.npm-cache/
+wasm/*.wasm
+!wasm/occt-worker.wasm
+!wasm/occt-worker.wasmtime.wasm
+wasm/*.map
+*.log
+
+# Local planning, handoff, and temporary CAD fixtures.
+/tmp-docs/
+/tmp-gdt.step
+/.claude/
+
+# Local credentials and key material.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Test and release outputs.
+coverage/
+.nyc_output/
+/release-assets/
+*.sha256
+
+# OS and editor metadata.
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,9 @@
+[submodule "occt"]
+	path = occt
+	url = https://github.com/Open-Cascade-SAS/OCCT.git
+[submodule "vendor/emsdk"]
+	path = vendor/emsdk
+	url = https://github.com/emscripten-core/emsdk.git
+[submodule "vendor/json"]
+	path = vendor/json
+	url = https://github.com/nlohmann/json.git

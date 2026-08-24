@@ -1,0 +1,11 @@
+{
+  "artifactSha256": "967343eff02d39a6f50c2c68c0a77123ce3576c7f78bfccae82f1bd6cc967bd8",
+  "iterations": 5,
+  "medianMs": {
+    "booleanCutMs": 2.9236000000000217,
+    "filletMs": 4.682299999999998,
+    "tessellateMs": 1.9574999999999818
+  },
+  "maximumRegressionFactor": 10
+}
+

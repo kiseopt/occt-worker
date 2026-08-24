@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - name: Verify tag and package version
+        shell: pwsh
+        run: |
+          $packageVersion = node -p "require('./package.json').version"
+          if ("v$packageVersion" -ne "${{ github.ref_name }}") {
+            throw "Tag ${{ github.ref_name }} does not match package version $packageVersion"
+          }
+      - run: npm run build:wasm
+      - name: Install Wasmtime
+        shell: pwsh
+        run: |
+          $wasmtime = & ./scripts/bootstrap-wasmtime.ps1
+          Split-Path -Parent $wasmtime | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - run: npm run build:wasm:wasmtime
+      - run: npm run test:wasmtime
+      - run: npm run build:wasm:debug
+      - run: npm test
+      - run: npm run test:debug
+      - run: npx playwright install chromium firefox webkit
+      - run: npm run test:browser:all
+      - run: npm run test:package
+      - run: npm run bench -- --iterations=5 --baseline=bench/baseline.json
+      - name: Verify generated release files
+        shell: pwsh
+        run: |
+          git diff --exit-code -- wasm/occt-worker.wasm wasm/occt-worker.wasmtime.wasm docs/g0-build.json docs/wasmtime-build.json protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/generated.ts kernel/include/generated.hpp
+          $mainHash = (Get-FileHash wasm/occt-worker.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
+          $wasmtimeHash = (Get-FileHash wasm/occt-worker.wasmtime.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$mainHash  occt-worker.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasm.sha256
+          "$wasmtimeHash  occt-worker.wasmtime.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasmtime.wasm.sha256
+      - name: Create corresponding source archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = '${{ github.ref_name }}'
+          $archiveBase = "occt-worker-$tag-corresponding-source"
+          $stageRoot = Join-Path $env:RUNNER_TEMP $archiveBase
+          $releaseAssets = Join-Path $PWD 'release-assets'
+          New-Item -ItemType Directory -Force -Path $stageRoot, $releaseAssets | Out-Null
+
+          $projectArchive = Join-Path $env:RUNNER_TEMP 'occt-worker-project.tar'
+          & git archive --format=tar HEAD --output=$projectArchive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & tar -xf $projectArchive -C $stageRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $sources = @(
+            @{ Path = 'occt'; Commit = 'b8f597c677811d1f9f4d8a97f5ae2825c0353a42' },
+            @{ Path = 'vendor/emsdk'; Commit = 'c0bb220cb6e6f4e0fabb6f6db9efd53390ef5e56' },
+            @{ Path = 'vendor/json'; Commit = '55f93686c01528224f448c19128836e7df245f72' }
+          )
+          foreach ($source in $sources) {
+            $actualCommit = (& git -C $source.Path rev-parse HEAD).Trim()
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($actualCommit -ne $source.Commit) {
+              throw "$($source.Path) is $actualCommit; expected $($source.Commit)"
+            }
+            $destination = Join-Path $stageRoot $source.Path
+            New-Item -ItemType Directory -Force -Path $destination | Out-Null
+            $sourceArchive = Join-Path $env:RUNNER_TEMP (($source.Path -replace '[\\/]', '-') + '.tar')
+            & git -C $source.Path archive --format=tar HEAD --output=$sourceArchive
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & tar -xf $sourceArchive -C $destination
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+          Push-Location $stageRoot
+          try {
+            & git apply --directory=occt --check patches/occt-8.0.1-wasm.patch
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & git apply --directory=occt patches/occt-8.0.1-wasm.patch
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+
+          $projectCommit = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @"
+          occt-worker release: $tag
+          occt-worker commit: $projectCommit
+          OCCT 8.0.1 commit: b8f597c677811d1f9f4d8a97f5ae2825c0353a42 (patch applied; patch retained at patches/occt-8.0.1-wasm.patch)
+          Emscripten SDK 4.0.23 commit: c0bb220cb6e6f4e0fabb6f6db9efd53390ef5e56
+          nlohmann/json 3.12.0 commit: 55f93686c01528224f448c19128836e7df245f72
+          npm dependencies: locked by npm-shrinkwrap.json
+          "@ | Set-Content -Encoding ascii (Join-Path $stageRoot 'SOURCE-IDENTITIES.txt')
+
+          $sourceAsset = Join-Path $releaseAssets "$archiveBase.tar.gz"
+          & tar -czf $sourceAsset -C $env:RUNNER_TEMP $archiveBase
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $sourceHash = (Get-FileHash $sourceAsset -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sourceHash  $archiveBase.tar.gz" | Set-Content -Encoding ascii "$sourceAsset.sha256"
+      - run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish GitHub release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" wasm/occt-worker.wasm wasm/occt-worker.wasm.sha256 wasm/occt-worker.wasmtime.wasm wasm/occt-worker.wasmtime.wasm.sha256 docs/g0-build.json docs/wasmtime-build.json "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz" "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz.sha256" --generate-notes

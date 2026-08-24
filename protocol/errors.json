@@ -1,0 +1,17 @@
+{
+  "protocolVersion": "1.0.0",
+  "errors": [
+    "ConstructionFailed",
+    "BooleanFailed",
+    "FilletFailed",
+    "TessellationFailed",
+    "ImportExportFailed",
+    "HealingFailed",
+    "Cancelled",
+    "InvalidHandle",
+    "InvalidArgs",
+    "OutOfMemory",
+    "KernelError",
+    "ProtocolError"
+  ]
+}

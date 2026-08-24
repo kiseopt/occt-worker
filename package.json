@@ -1,0 +1,99 @@
+{
+  "name": "occt-worker",
+  "version": "1.0.0",
+  "description": "OCCT geometry kernel for WebAssembly - narrow message protocol, reproducible workflows, browser and Node first",
+  "author": "occt-worker contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiseopt/occt-worker.git"
+  },
+  "homepage": "https://github.com/kiseopt/occt-worker#readme",
+  "bugs": {
+    "url": "https://github.com/kiseopt/occt-worker/issues"
+  },
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSES.md",
+  "keywords": [
+    "occt",
+    "opencascade",
+    "wasm",
+    "webassembly",
+    "brep",
+    "cad",
+    "geometry-kernel",
+    "step"
+  ],
+  "files": [
+    "dist",
+    "wasm",
+    "kernel",
+    "protocol",
+    "ts",
+    "scripts",
+    "docs",
+    "examples",
+    "patches",
+    "CMakeLists.txt",
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "tsconfig.json",
+    ".gitmodules",
+    "CONTRIBUTING.md",
+    "CONTRIBUTING.zh-CN.md",
+    "SOURCE.md",
+    "SOURCE.zh-CN.md",
+    "README.md",
+    "README.zh-CN.md",
+    "SECURITY.md",
+    "SECURITY.zh-CN.md",
+    "CHANGELOG.md",
+    "CHANGELOG.zh-CN.md",
+    "CODE_OF_CONDUCT.md",
+    "NOTICE",
+    "NOTICE.zh-CN.md",
+    "LICENSES.md",
+    "LICENSES.zh-CN.md",
+    "LICENSE-APACHE-2.0.txt",
+    "THIRD-PARTY-NOTICES.txt",
+    "THIRD-PARTY-NOTICES.zh-CN.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./worker": "./dist/worker-entry.js",
+    "./wasm": "./wasm/occt-worker.wasm",
+    "./wasm/occt-worker.wasm": "./wasm/occt-worker.wasm",
+    "./wasm/wasmtime": "./wasm/occt-worker.wasmtime.wasm",
+    "./wasm/occt-worker.wasmtime.wasm": "./wasm/occt-worker.wasmtime.wasm"
+  },
+  "scripts": {
+    "bootstrap:sources": "node scripts/bootstrap-sources.mjs",
+    "generate": "node scripts/generate-protocol.mjs",
+    "build": "npm run generate && tsc -p tsconfig.json",
+    "prepack": "npm run build && node scripts/verify-wasm.mjs --quiet",
+    "prepublishOnly": "npm test && npm run test:browser:all && npm run test:package",
+    "build:wasm": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-wasm.ps1",
+    "build:wasm:debug": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-wasm.ps1 -Configuration Debug",
+    "build:wasm:wasmtime": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-wasmtime-wasm.ps1",
+    "test:wasmtime": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-wasmtime.ps1",
+    "test": "npm run build && node --test tests/ts/*.test.mjs",
+    "test:debug": "npm run build && node tests/ts/debug-smoke.mjs",
+    "test:browser": "node tests/browser/run.mjs",
+    "test:browser:all": "node tests/browser/run.mjs --browser=chromium && node tests/browser/run.mjs --browser=firefox && node tests/browser/run.mjs --browser=webkit",
+    "test:package": "node tests/package/consumer.mjs",
+    "bench": "node bench/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "draco3dgltf": "1.5.7",
+    "meshoptimizer": "1.2.0"
+  }
+}

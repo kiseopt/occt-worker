@@ -1,0 +1,10 @@
+occt-worker
+
+Copyright 2026 occt-worker contributors.
+
+This project is not affiliated with or endorsed by Open Cascade SAS.
+
+The distribution contains Open CASCADE Technology 8.0.1, which is licensed under the GNU Lesser General Public License version 2.1 with the Open CASCADE exception. The corresponding OCCT source is pinned in the `occt` submodule. Its license and exception text are installed with the build and must accompany redistributed binaries.
+
+The distribution also contains Emscripten runtime/system code and nlohmann/json. Their license notices are listed in LICENSES.md. Independent occt-worker kernel, protocol, TypeScript, scripts, and documentation are Apache-2.0.
+

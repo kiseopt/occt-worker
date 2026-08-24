@@ -1,0 +1,2 @@
+# package.json "files" is the authoritative publication allowlist.
+wasm/occt-worker.debug.wasm

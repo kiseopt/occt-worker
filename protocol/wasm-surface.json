@@ -1,0 +1,32 @@
+{
+  "imports": [
+    { "module": "env", "name": "emscripten_get_preloaded_image_data", "kind": "function" },
+    { "module": "env", "name": "emscripten_get_callstack", "kind": "function" },
+    { "module": "env", "name": "OSD_MemInfo_getModuleHeapLength", "kind": "function" },
+    { "module": "env", "name": "emscripten_notify_memory_growth", "kind": "function" },
+    { "module": "wasi_snapshot_preview1", "name": "fd_close", "kind": "function" },
+    { "module": "wasi_snapshot_preview1", "name": "fd_read", "kind": "function" },
+    { "module": "wasi_snapshot_preview1", "name": "fd_write", "kind": "function" },
+    { "module": "wasi_snapshot_preview1", "name": "proc_exit", "kind": "function" },
+    { "module": "env", "name": "__syscall_faccessat", "kind": "function" },
+    { "module": "env", "name": "__syscall_chmod", "kind": "function" },
+    { "module": "env", "name": "occt_worker_cancelled", "kind": "function" },
+    { "module": "env", "name": "occt_worker_progress", "kind": "function" },
+    { "module": "wasi_snapshot_preview1", "name": "clock_time_get", "kind": "function" },
+    { "module": "wasi_snapshot_preview1", "name": "environ_sizes_get", "kind": "function" },
+    { "module": "wasi_snapshot_preview1", "name": "environ_get", "kind": "function" },
+    { "module": "wasi_snapshot_preview1", "name": "fd_seek", "kind": "function" }
+  ],
+  "exports": [
+    { "name": "memory", "kind": "memory" },
+    { "name": "k_alloc", "kind": "function" },
+    { "name": "k_free", "kind": "function" },
+    { "name": "k_handle", "kind": "function" },
+    { "name": "__indirect_function_table", "kind": "table" },
+    { "name": "k_response_ptr", "kind": "function" },
+    { "name": "k_buffer_ptr", "kind": "function" },
+    { "name": "k_buffer_len", "kind": "function" },
+    { "name": "_initialize", "kind": "function" },
+    { "name": "__trap", "kind": "function" }
+  ]
+}

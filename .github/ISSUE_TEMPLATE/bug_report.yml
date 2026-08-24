@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible problem in the library, worker, protocol, or build.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing issues first. Remove proprietary CAD data and credentials before posting.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include a small code sample, test case, or sanitized input file description.
+      render: javascript
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version or commit
+      placeholder: "1.0.0 or abc1234"
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host environment
+      placeholder: "Node 22 on Windows 11, or Chromium 140 Worker"
+    validations:
+      required: true
+  - type: input
+    id: artifact
+    attributes:
+      label: wasm artifact SHA-256
+      description: Include the hash when the issue involves runtime behavior or binary output.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and diagnostics
+      description: Include the error code, stack, protocol request, or relevant test output.
+      render: text
+    validations:
+      required: false

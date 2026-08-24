@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:wasm
+      - run: git diff --exit-code -- wasm/occt-worker.wasm docs/g0-build.json
+      - name: Install Wasmtime
+        shell: pwsh
+        run: |
+          $wasmtime = & ./scripts/bootstrap-wasmtime.ps1
+          Split-Path -Parent $wasmtime | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - run: npm run build:wasm:wasmtime
+      - run: npm run test:wasmtime
+      - run: git diff --exit-code -- wasm/occt-worker.wasmtime.wasm docs/wasmtime-build.json
+      - run: npm run build:wasm:debug
+      - run: npm test
+      - run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/generated.ts kernel/include/generated.hpp
+      - run: npm run test:debug
+      - run: npx playwright install chromium firefox webkit
+      - run: npm run test:browser:all
+      - run: npm run test:package
+      - run: npm run bench -- --iterations=5 --baseline=bench/baseline.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: occt-worker-wasm
+          path: |
+            wasm/occt-worker.wasm
+            wasm/occt-worker.wasmtime.wasm
+            build/debug/occt-worker.debug.wasm
+            docs/g0-build.json
+            docs/wasmtime-build.json

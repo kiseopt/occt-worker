@@ -1,0 +1,14 @@
+# Store and check out text files with stable LF line endings.
+* text=auto eol=lf
+
+# Never apply text normalization to binary artifacts.
+*.wasm binary
+*.zip binary
+*.7z binary
+*.tar binary
+*.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
