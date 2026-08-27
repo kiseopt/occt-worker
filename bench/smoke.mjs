@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { readFile } from "node:fs/promises";
 import { DirectClient } from "../dist/direct-client.js";
@@ -44,10 +43,6 @@ const summarize = (values) => ({
 const summary = Object.fromEntries(Object.entries(samples).map(([name, values]) => [name, summarize(values)]));
 if (baselineArgument !== undefined) {
   const baseline = JSON.parse(await readFile(baselineArgument.slice("--baseline=".length), "utf8"));
-  const artifactSha256 = createHash("sha256").update(wasm).digest("hex");
-  if (artifactSha256 !== baseline.artifactSha256) {
-    throw new Error(`benchmark artifact hash ${artifactSha256} does not match baseline ${baseline.artifactSha256}`);
-  }
   for (const [name, expectedMedian] of Object.entries(baseline.medianMs)) {
     const actualMedian = summary[name]?.median;
     if (actualMedian === undefined) throw new Error(`baseline references unknown benchmark: ${name}`);

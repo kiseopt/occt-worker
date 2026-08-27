@@ -13,6 +13,12 @@ $artifactDir = Join-Path $repo 'artifacts'
 . (Join-Path $PSScriptRoot 'build-config.ps1')
 $buildConfig = Get-OcctWasmBuildConfig
 
+$occtChanges = & git -C (Join-Path $repo 'occt') status --porcelain
+if ($occtChanges) {
+  $occtChanges | Write-Error
+  throw 'OCCT source tree must be clean'
+}
+
 if (-not (Test-Path -LiteralPath (Join-Path $occtInstall 'include/opencascade/Standard.hxx'))) {
   & (Join-Path $repo 'scripts/build-wasm.ps1') -Configuration $Configuration
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

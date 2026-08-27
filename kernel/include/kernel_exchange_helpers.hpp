@@ -112,11 +112,6 @@ namespace occt_worker {
     std::size_t theNodeCount,
     const occ::handle<XCAFDoc_DimTolTool>& theDimTolTool);
 
-  void restoreXmlDocumentMetadata(
-    const json& theMetadata,
-    const std::vector<TDF_Label>& theOccurrenceLabels,
-    const occ::handle<XCAFDoc_DimTolTool>& theDimTolTool);
-
   std::array<float, 4> parseNormalizedColor(const json& theValue,
                                                    const char* theError);
 

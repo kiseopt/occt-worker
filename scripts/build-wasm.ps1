@@ -24,8 +24,11 @@ if (-not (Test-Path (Join-Path $emsdk 'upstream/emscripten/emcc.py'))) {
 & $emsdkCommand activate $buildConfig.EmsdkVersion
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $emsdk 'emsdk_env.ps1') | Out-Null
-node (Join-Path $repo 'scripts/apply-occt-patches.mjs')
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$occtChanges = & git -C (Join-Path $repo 'occt') status --porcelain
+if ($occtChanges) {
+  $occtChanges | Write-Error
+  throw 'OCCT source tree must be clean'
+}
 node (Join-Path $repo 'scripts/generate-protocol.mjs')
 
 # -UOCC_CONVERT_SIGNALS: OCC_CATCH_SIGNALS must not expand to setjmp. This kernel never installs

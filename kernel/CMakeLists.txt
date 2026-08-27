@@ -46,7 +46,6 @@ set(EXCHANGE_CAD_SOURCES
   operations/exchange_document_export.cpp
   operations/exchange_document_writers.cpp
   operations/exchange_document_nodes.cpp
-  operations/exchange_document_metadata.cpp
   operations/exchange_document_annotations.cpp
   operations/exchange_document_import.cpp
   operations/exchange_probe.cpp

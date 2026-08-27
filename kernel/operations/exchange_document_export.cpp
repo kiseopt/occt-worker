@@ -541,6 +541,10 @@ ExportDocumentData buildExportDocument(KernelOperationContext& theContext,
 
 json h_exportSTEPDocument(KernelOperationContext& theContext, const json& theArgs)
 {
+  if (theArgs.contains("gdt") && !theArgs.at("gdt").empty()
+      && theArgs.at("roots").size() != 1)
+    throw KernelFailure(ErrorCode::InvalidArgs,
+                        "STEP GDT export requires exactly one document root");
   ExportDocumentData aData = buildExportDocument(theContext, theArgs, "BinXCAF");
   const json& aNodes = theArgs.at("nodes");
   applyDocumentAnnotations(theContext, 
@@ -553,6 +557,25 @@ json h_exportXCAF(KernelOperationContext& theContext, const json& theArgs)
   const std::string aFormat = theArgs.value("format", "bin");
   if (aFormat != "bin" && aFormat != "xml")
     throw KernelFailure(ErrorCode::InvalidArgs, "XCAF format must be bin or xml");
+  if (aFormat == "xml")
+  {
+    for (const json& aNode : theArgs.at("nodes"))
+    {
+      if (aNode.contains("color"))
+        throw KernelFailure(ErrorCode::InvalidArgs,
+                            "XCAF XML cannot preserve node RGBA color; use format bin");
+      if (aNode.contains("subshapeStyles") && !aNode.at("subshapeStyles").empty())
+        throw KernelFailure(ErrorCode::InvalidArgs,
+                            "XCAF XML cannot preserve subshape RGBA styles; use format bin");
+    }
+    if (theArgs.contains("shuo"))
+    {
+      for (const json& aShuo : theArgs.at("shuo"))
+        if (aShuo.contains("color"))
+          throw KernelFailure(ErrorCode::InvalidArgs,
+                              "XCAF XML cannot preserve SHUO RGBA color; use format bin");
+    }
+  }
   ExportDocumentData aData = buildExportDocument(
     theContext, theArgs, aFormat == "xml" ? "XmlXCAF" : "BinXCAF");
   const json& aNodes = theArgs.at("nodes");

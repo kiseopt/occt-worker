@@ -30,11 +30,8 @@ for (const { path: relativePath, url, commit } of sources) {
   if (actual !== commit) throw new Error(`${relativePath} is ${actual}; expected ${commit}`);
 }
 
-const patchResult = spawnSync(process.execPath, [join(root, "scripts/apply-occt-patches.mjs")], {
-  cwd: root,
-  encoding: "utf8",
-  stdio: "inherit",
-});
-if (patchResult.status !== 0) throw new Error("Failed to apply OCCT wasm patch");
+const occt = join(root, identity.sources.occt.path);
+const occtChanges = git(["status", "--porcelain"], occt);
+if (occtChanges !== "") throw new Error(`OCCT source tree must be clean:\n${occtChanges}`);
 
 console.log(JSON.stringify(Object.fromEntries(sources.map(({ path, commit }) => [path, commit])), null, 2));

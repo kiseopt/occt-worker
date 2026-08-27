@@ -37,9 +37,9 @@ Sketch 支持 line/circle/arc/BSpline、construction geometry、几何/尺寸约
 - PLY：ASCII、little-endian、big-endian；法线、UV、u8 颜色和 comments/obj_info。
 - VRML 1/2：shape 和 indexed mesh、法线、UV、透明度受格式限制的颜色。
 - glTF/GLB：场景层级、实例变换、材质/纹理/动画/skin/camera/extras、sparse accessor、morph、四影响骨骼、动画采样、Z-up/Y-up 转换，以及 Draco/meshopt 解码。
-- 原生 XCAF binary/XML：装配和公共 PBR 字段，XML 使用受验证的元数据标记恢复固定驱动遗漏的记录。
+- 原生 XCAF binary 和项目生成的 XML：装配和公共 PBR 字段；XML 内存导入依赖受验证的 binary 恢复标记，第三方 XmlXCAF、节点颜色、子形状样式和带颜色 SHUO 必须使用 binary。
 
-不支持的语义不会静默丢弃：例如 IGES XCAF 的语义标注和 STEP 无法保留的链接会明确返回错误。
+不支持的语义不会静默丢弃：例如 IGES XCAF 的语义标注、STEP 无法保留的链接、携带 GDT 的多根 STEP 文档和 XML 不支持的 RGBA 组合都会明确返回错误。
 
 ## 网格能力
 

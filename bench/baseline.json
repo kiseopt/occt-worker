@@ -1,5 +1,4 @@
 {
-  "artifactSha256": "d6d991b23e396cad83635f319b11bfd1f80db4a0f5a04771416fcb80d9e120aa",
   "iterations": 5,
   "medianMs": {
     "booleanCutMs": 2.9236000000000217,

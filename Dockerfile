@@ -58,7 +58,6 @@ SHELL ["/bin/bash", "-c"]
 
 RUN source "${EMSDK}/emsdk_env.sh" \
     && export PATH="${EMSDK}:${EMSDK}/upstream/emscripten:${EMSDK}/upstream/bin:${PATH}" \
-    && node scripts/apply-occt-patches.mjs \
     && npm ci --ignore-scripts --no-audit --no-fund \
     && npm run build
 

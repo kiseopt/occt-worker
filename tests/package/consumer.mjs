@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
@@ -12,13 +13,26 @@ const temporary = await mkdtemp(join(tmpdir(), "occt-worker-package-"));
 const npmCli = process.env.npm_execpath;
 if (npmCli === undefined) throw new Error("Run this test through npm run test:package");
 const npm = (args, options = {}) => execFileSync(process.execPath, [npmCli, ...args], options);
+const tarballArgument = process.argv.find((value) => value.startsWith("--tarball="));
 
 try {
-  const pack = JSON.parse(npm(["pack", "--json", "--pack-destination", temporary], {
-    cwd: repository,
-    encoding: "utf8",
-  }))[0];
-  const tarball = join(temporary, pack.filename);
+  let pack;
+  let tarball;
+  if (tarballArgument === undefined) {
+    pack = JSON.parse(npm(["pack", "--json", "--pack-destination", temporary], {
+      cwd: repository,
+      encoding: "utf8",
+    }))[0];
+    tarball = join(temporary, pack.filename);
+  } else {
+    tarball = resolve(repository, tarballArgument.slice("--tarball=".length));
+    const tarballInfo = await stat(tarball);
+    const files = execFileSync("tar", ["-tf", tarball], { encoding: "utf8" })
+      .split(/\r?\n/u)
+      .filter((path) => path.startsWith("package/") && !path.endsWith("/"))
+      .map((path) => ({ path: path.slice("package/".length) }));
+    pack = { files, size: tarballInfo.size };
+  }
   const unpacked = join(temporary, "unpacked");
   await mkdir(unpacked);
   execFileSync("tar", ["-xf", tarball, "-C", unpacked]);
@@ -103,7 +117,21 @@ try {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
   const installedPackage = JSON.parse(await readFile(join(temporary, "node_modules/occt-worker/package.json"), "utf8"));
-  assert.equal(installedPackage.version, "1.2.0");
+  const sourcePackage = JSON.parse(await readFile(join(repository, "package.json"), "utf8"));
+  assert.equal(installedPackage.version, sourcePackage.version);
+  for (const [artifact, report] of [
+    ["occt-worker.wasm", "g0-build.json"],
+    ["occt-worker.wasmtime.wasm", "wasmtime-build.json"],
+  ]) {
+    const bytes = await readFile(join(temporary, "node_modules/occt-worker/wasm", artifact));
+    const metadata = JSON.parse(await readFile(join(temporary, "node_modules/occt-worker/docs", report), "utf8"));
+    assert.equal(metadata.sizeBytes, bytes.byteLength, `${report} size does not match ${artifact}`);
+    assert.equal(
+      metadata.sha256,
+      createHash("sha256").update(bytes).digest("hex"),
+      `${report} SHA-256 does not match ${artifact}`,
+    );
+  }
   assert.ok(pack.files.some(({ path }) => path === "SOURCE.md"));
   assert.ok(pack.files.some(({ path }) => path === "npm-shrinkwrap.json"));
   assert.ok(pack.files.some(({ path }) => path === "THIRD-PARTY-NOTICES.txt"));

@@ -27,6 +27,12 @@ $cFlags = $buildConfig.OcctCFlags -join ' '
 $picFlags = (@('-fPIC') + $buildConfig.OcctCxxFlags) -join ' '
 $occtCMakeArguments = $buildConfig.OcctCMakeArguments
 
+$occtChanges = & git -C (Join-Path $repo 'occt') status --porcelain
+if ($occtChanges) {
+  $occtChanges | Write-Error
+  throw 'OCCT source tree must be clean'
+}
+
 $toolPaths = & (Join-Path $repo 'scripts/bootstrap-tools.ps1')
 $env:PATH = (($toolPaths | Where-Object { $_ }) -join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $env:PATH
 & (Join-Path $emsdk 'emsdk.ps1') activate $buildConfig.EmsdkVersion

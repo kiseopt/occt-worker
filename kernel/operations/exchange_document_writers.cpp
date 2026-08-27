@@ -37,36 +37,16 @@ json writeXCAFDocument(KernelOperationContext& theContext,
   if (anApplication->SaveAs(theDocument, aStream) != PCDM_SS_OK)
     throw KernelFailure(ErrorCode::ImportExportFailed, "OCCT XCAF document write failed");
   std::string aData = aStream.str();
-  if (theFormat == "xml"
-      && ((theArgs.contains("datums") && !theArgs.at("datums").empty())
-          || (theArgs.contains("geometricTolerances")
-              && !theArgs.at("geometricTolerances").empty())))
+  if (theFormat == "xml")
   {
-    json aMetadata = {
-      {"version", 1},
-      {"datums", theArgs.value("datums", json::array())},
-      {"geometricTolerances", theArgs.value("geometricTolerances", json::array())}
-    };
-    auto persistMarkerPresentation = [&](json& theItem) {
-      if (!theItem.is_object() || !theItem.contains("presentation")) return;
-      const json& aPresentation = theItem.at("presentation");
-      std::ostringstream aPresentationStream(std::ios::out | std::ios::binary);
-      BRepTools::Write(theContext.arena().get(requiredU32(aPresentation, "shape")),
-                       aPresentationStream, false, false,
-                       TopTools_FormatVersion_CURRENT);
-      theItem["presentationBrep"] = aPresentationStream.str();
-      if (aPresentation.contains("name"))
-        theItem["presentationName"] = aPresentation.at("name");
-      theItem.erase("presentation");
-    };
-    for (json& aDatum : aMetadata["datums"])
-      persistMarkerPresentation(aDatum);
-    for (json& aTolerance : aMetadata["geometricTolerances"])
-      persistMarkerPresentation(aTolerance);
-
-    const std::string aPayload = aMetadata.dump();
-    const std::string aEncoded = encodeHex(aPayload);
-    const std::string aMarker = "<!-- occt-worker-xcaf-meta:" + aEncoded + " -->";
+    BinXCAFDrivers::DefineFormat(anApplication);
+    theDocument->ChangeStorageFormat("BinXCAF");
+    std::stringstream aRecoveryStream(std::ios::in | std::ios::out | std::ios::binary);
+    if (anApplication->SaveAs(theDocument, aRecoveryStream) != PCDM_SS_OK)
+      throw KernelFailure(ErrorCode::ImportExportFailed,
+                          "OCCT XCAF binary recovery write failed");
+    const std::string aMarker = "<!-- occt-worker-xcaf-bin:"
+      + encodeHex(aRecoveryStream.str()) + " -->";
     const std::size_t anEnd = aData.rfind("</document>");
     if (anEnd == std::string::npos)
       aData += "\n" + aMarker + "\n";

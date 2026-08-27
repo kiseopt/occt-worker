@@ -279,6 +279,26 @@ test("STEP XCAF document round-trip preserves size dimensions", async () => {
   assert.equal((await client.stats()).liveShapeHandles, 0);
 });
 
+test("STEP XCAF document rejects GDT across multiple roots", async () => {
+  const client = await DirectClient.create(wasm);
+  const scope = await client.beginScope();
+  const first = await scope.makeBox([1, 1, 1]);
+  const second = await scope.makeBox([2, 2, 2]);
+  await assert.rejects(
+    client.exportSTEPDocument({
+      nodes: [
+        { kind: "part", shape: first },
+        { kind: "part", shape: second },
+      ],
+      roots: [0, 1],
+      gdt: [{ node: 0, type: "length", value: 1 }],
+    }),
+    (error) => error.code === "InvalidArgs"
+      && /requires exactly one document root/.test(error.message),
+  );
+  await scope.end();
+});
+
 test("native XCAF datum metadata and shape link round-trip", async () => {
   const client = await DirectClient.create(wasm);
   const scope = await client.beginScope();
@@ -469,7 +489,10 @@ test("native XCAF persistence round-trips bounded views and SHUO paths", async (
     shuo: [{ nodeIndices: [1, 0], color: [0.2, 0.4, 0.6, 0.8] }],
   };
   for (const format of ["bin", "xml"]) {
-    const data = await client.exportXCAF(document, format);
+    const exportDocument = format === "xml"
+      ? { ...document, shuo: [{ nodeIndices: [1, 0] }] }
+      : document;
+    const data = await client.exportXCAF(exportDocument, format);
     const restored = await scope.importXCAF(data, format);
     assert.equal(restored.views.length, 1);
     assert.equal(restored.views[0].name, "Front");
@@ -483,7 +506,10 @@ test("native XCAF persistence round-trips bounded views and SHUO paths", async (
       capping: true,
     }]);
     assert.deepEqual(restored.shuo[0].nodeIndices, [1, 2]);
-    assert.ok(restored.shuo[0].color.every((value, index) => Math.abs(value - [0.2, 0.4, 0.6, 0.8][index]) < 1e-6));
+    if (format === "bin")
+      assert.ok(restored.shuo[0].color.every((value, index) => Math.abs(value - [0.2, 0.4, 0.6, 0.8][index]) < 1e-6));
+    else
+      assert.equal("color" in restored.shuo[0], false);
   }
   await assert.rejects(
     client.exportXCAF({
@@ -503,7 +529,7 @@ test("native XCAF persistence round-trips bounded views and SHUO paths", async (
   assert.equal((await client.stats()).liveShapeHandles, 0);
 });
 
-test("native XCAF binary and XML persistence round-trip assembly metadata", async () => {
+test("native XCAF binary persistence round-trips complete assembly metadata", async () => {
   const client = await DirectClient.create(wasm);
   const scope = await client.beginScope();
   const box = await scope.makeBox([2, 3, 4]);
@@ -538,15 +564,14 @@ test("native XCAF binary and XML persistence round-trip assembly metadata", asyn
     roots: [1],
   };
 
-  for (const format of ["bin", "xml"]) {
-    const data = await client.exportXCAF(document, format);
-    assert.ok(data.byteLength > 0);
-    assert.deepEqual(await client.probeFormat(data), {
-      format: "xcaf",
-      encoding: format === "bin" ? "binary" : "text",
-      confidence: "exact",
-    });
-    const restored = await scope.importXCAF(data, format);
+  const data = await client.exportXCAF(document, "bin");
+  assert.ok(data.byteLength > 0);
+  assert.deepEqual(await client.probeFormat(data), {
+    format: "xcaf",
+    encoding: "binary",
+    confidence: "exact",
+  });
+  const restored = await scope.importXCAF(data, "bin");
     assert.equal(restored.rootCount, 1);
     const root = restored.nodes[restored.roots[0]];
     assert.equal(root.kind, "assembly");
@@ -583,10 +608,59 @@ test("native XCAF binary and XML persistence round-trip assembly metadata", asyn
     assert.ok(Math.abs(child.subshapeStyles[1].color[1] - 0.9) < 1e-5);
     assert.ok(Math.abs(child.subshapeStyles[1].color[3] - 0.7) < 1e-5);
     assert.equal(child.visible, false);
-    const bounds = await client.bbox(restored.shape);
-    assert.ok(Math.abs(bounds.min[0] - 5) < 1e-6);
-    assert.ok(Math.abs(bounds.max[0] - 7) < 1e-6);
-  }
+  const bounds = await client.bbox(restored.shape);
+  assert.ok(Math.abs(bounds.min[0] - 5) < 1e-6);
+  assert.ok(Math.abs(bounds.max[0] - 7) < 1e-6);
+
+  const { color, subshapeStyles, ...xmlPart } = document.nodes[0];
+  const xml = await client.exportXCAF({
+    ...document,
+    nodes: [xmlPart, document.nodes[1]],
+  }, "xml");
+  const restoredXml = await scope.importXCAF(xml, "xml");
+  const restoredXmlPart = restoredXml.nodes[restoredXml.nodes[restoredXml.roots[0]].children[0]];
+  assert.equal(restoredXmlPart.material.name, "Aluminum");
+  assert.equal(restoredXmlPart.material.density, 2700);
+  assert.equal(restoredXmlPart.visualMaterial.name, "Blue anodized");
+  assert.ok(Math.abs(restoredXmlPart.visualMaterial.baseColor[0] - 0.15) < 1e-5);
+  const plainXml = new TextEncoder().encode(
+    new TextDecoder().decode(xml).replace(
+      /<!-- occt-worker-xcaf-bin:[0-9a-f]+ -->\n?/,
+      "",
+    ),
+  );
+  await assert.rejects(
+    scope.importXCAF(plainXml, "xml"),
+    (error) => error.code === "ImportExportFailed" && /recovery marker/.test(error.message),
+  );
+
+  await assert.rejects(
+    client.exportXCAF({
+      nodes: [{ kind: "part", shape: box, color: [1, 0, 0, 1] }],
+      roots: [0],
+    }, "xml"),
+    (error) => error.code === "InvalidArgs" && /node RGBA color/.test(error.message),
+  );
+  await assert.rejects(
+    client.exportXCAF({
+      nodes: [{ kind: "part", shape: box, subshapeStyles: [
+        { topology: "face", index: 0, color: [1, 0, 0, 1] },
+      ] }],
+      roots: [0],
+    }, "xml"),
+    (error) => error.code === "InvalidArgs" && /subshape RGBA styles/.test(error.message),
+  );
+  await assert.rejects(
+    client.exportXCAF({
+      nodes: [
+        { kind: "part", shape: box },
+        { kind: "assembly", children: [0] },
+      ],
+      roots: [1],
+      shuo: [{ nodeIndices: [1, 0], color: [1, 0, 0, 1] }],
+    }, "xml"),
+    (error) => error.code === "InvalidArgs" && /SHUO RGBA color/.test(error.message),
+  );
 
   await assert.rejects(
     client.exportXCAF({
@@ -635,4 +709,3 @@ test("importIGES rejects non-IGES payloads", async () => {
   );
   await scope.end();
 });
-

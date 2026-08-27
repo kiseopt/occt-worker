@@ -133,56 +133,38 @@ json h_importXCAF(KernelOperationContext& theContext, const json& theArgs)
   if (aFormat != "bin" && aFormat != "xml")
     throw KernelFailure(ErrorCode::InvalidArgs, "XCAF format must be bin or xml");
 
-  json aXmlMetadata;
+  std::string aPersistenceData = aData;
   if (aFormat == "xml")
   {
-    const std::string aMarker = "<!-- occt-worker-xcaf-meta:";
+    std::istringstream anXmlStream(aData, std::ios::in | std::ios::binary);
+    occ::handle<Storage_Data> aStorageData;
+    if (PCDM_ReadWriter::FileFormat(anXmlStream, aStorageData) != "XmlXCAF")
+      throw KernelFailure(ErrorCode::ImportExportFailed,
+                          "XCAF XML input is not an XmlXCAF document");
+    const std::string aMarker = "<!-- occt-worker-xcaf-bin:";
     const std::size_t aMarkerPosition = aData.find(aMarker);
-    if (aMarkerPosition != std::string::npos)
-    {
-      const std::size_t aHexStart = aMarkerPosition + aMarker.size();
-      const std::size_t aMarkerEnd = aData.find(" -->", aHexStart);
-      const std::string aPayload = decodeHexMarker(
-        aData, aHexStart, aMarkerEnd, "XCAF XML metadata marker is invalid");
-      try { aXmlMetadata = json::parse(aPayload); }
-      catch (const std::exception&)
-      {
-        throw KernelFailure(ErrorCode::ImportExportFailed, "XCAF XML metadata marker is invalid");
-      }
-      if (!aXmlMetadata.is_object() || aXmlMetadata.value("version", 0) != 1
-          || !aXmlMetadata.value("datums", json::array()).is_array()
-          || !aXmlMetadata.value("geometricTolerances", json::array()).is_array())
-        throw KernelFailure(ErrorCode::ImportExportFailed, "XCAF XML metadata marker is invalid");
-    }
+    if (aMarkerPosition == std::string::npos)
+      throw KernelFailure(ErrorCode::ImportExportFailed,
+                          "XCAF XML input lacks the occt-worker recovery marker; "
+                          "import XCAF binary or XML produced by exportXCAF()");
+    const std::size_t aHexStart = aMarkerPosition + aMarker.size();
+    const std::size_t aMarkerEnd = aData.find(" -->", aHexStart);
+    aPersistenceData = decodeHexMarker(
+      aData, aHexStart, aMarkerEnd, "XCAF XML recovery marker is invalid");
   }
 
   const occ::handle<TDocStd_Application> anApplication = new TDocStd_Application();
   occ::handle<TDocStd_Document> aDocument;
-  if (aFormat == "bin")
-  {
-    BinXCAFDrivers::DefineFormat(anApplication);
-    std::istringstream aStream(aData, std::ios::in | std::ios::binary);
-    if (anApplication->Open(aStream, aDocument) != PCDM_RS_OK || aDocument.IsNull())
-      throw KernelFailure(ErrorCode::ImportExportFailed, "XCAF document input could not be parsed");
-  }
-  else
-  {
-    XmlXCAFDrivers::DefineFormat(anApplication);
-    aDocument = new TDocStd_Document("XmlXCAF");
-    aDocument->Open(anApplication);
-    std::istringstream aStream(aData, std::ios::in | std::ios::binary);
-    XmlXCAFStreamReader aReader;
-    aReader.read(aStream, aDocument, anApplication);
-    if (aReader.GetStatus() != PCDM_RS_OK)
-      throw KernelFailure(ErrorCode::ImportExportFailed, "XCAF document input could not be parsed");
-  }
+  BinXCAFDrivers::DefineFormat(anApplication);
+  std::istringstream aStream(aPersistenceData, std::ios::in | std::ios::binary);
+  if (anApplication->Open(aStream, aDocument) != PCDM_RS_OK || aDocument.IsNull())
+    throw KernelFailure(ErrorCode::ImportExportFailed, "XCAF document input could not be parsed");
   XCAFDoc_DocumentTool::Set(aDocument->Main());
 
   ImportedDocumentData aImported = inspectImportedDocument(aDocument);
   DocumentNodeData aNodes = extractDocumentNodes(theContext, 
     false, json(), aScope, aImported.shapeTool, aImported.colorTool, aImported.layerTool,
     aImported.visMaterialTool, aImported.rootLabels);
-  restoreXmlDocumentMetadata(aXmlMetadata, aNodes.occurrenceLabels, aImported.dimTolTool);
   const DocumentAnnotationData aAnnotations =
     extractDocumentAnnotations(theContext, false, {}, aScope, aImported.viewTool,
       aImported.clippingPlaneTool, aImported.dimTolTool,

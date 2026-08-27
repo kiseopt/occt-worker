@@ -36,6 +36,8 @@ wasm ABI 为同步串行调用：宿主用 `k_alloc` 分配请求内存，写入
 
 STEP/IGES 单位、schema、时间戳、OBJ/PLY/VRML 编码、XCAF 格式、glTF 资源和所有默认值均在 `protocol/operation-contracts.json` 冻结。BREP 必须绑定精确 wasm SHA-256 才能作为缓存使用；它不是跨版本交换格式。
 
+XCAF XML 输出是标准 XmlXCAF，并内嵌经校验的 binary 恢复标记；内存导入只接受 `exportXCAF()` 生成的 XML，第三方 XmlXCAF 必须先转换为 XCAF binary。节点 `color`、非空 `subshapeStyles` 和带 `color` 的 SHUO 无法在标准 XML 部分无损保存，导出时会返回 `InvalidArgs`；这些组合必须直接使用 XCAF binary。STEP 文档携带 GDT 时必须只有一个根节点。
+
 ## 确定性边界
 
 内核关闭并行 BOP/网格，固定浮点收缩策略，不读取系统时间或随机数。几何结果按容差比较；只有协议明确规范化的布局才比较原始字节。拓扑顺序不等同于持久拓扑命名。

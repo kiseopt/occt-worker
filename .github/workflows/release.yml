@@ -9,6 +9,10 @@ permissions:
   contents: write
   id-token: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: windows-latest
@@ -30,6 +34,14 @@ jobs:
             throw "Tag ${{ github.ref_name }} does not match package version $packageVersion"
           }
       - run: npm run build:wasm
+      - name: Verify pristine OCCT source
+        shell: pwsh
+        run: |
+          $changes = git -C occt status --porcelain
+          if ($changes) {
+            $changes
+            throw 'OCCT source tree must be clean'
+          }
       - run: npm run build:wasm:profiles
       - run: npm run build:wasm:shared
       - name: Verify modular artifacts and set release URLs
@@ -38,6 +50,7 @@ jobs:
           $releaseBase = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/"
           node scripts/verify-artifacts.mjs --write --release-base-url $releaseBase
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: npm run test:artifacts
       - name: Install Wasmtime
         shell: pwsh
         run: |
@@ -47,19 +60,34 @@ jobs:
       - run: npm run test:wasmtime
       - run: npm run build:wasm:debug
       - run: npm test
+      - name: Verify source-generated files
+        run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
       - run: npm run test:debug
       - run: npx playwright install chromium firefox webkit
       - run: npm run test:browser:all
-      - run: npm run test:package
-      - run: npm run bench -- --iterations=5 --baseline=bench/baseline.json
-      - name: Verify generated release files
+      - run: npm run bench -- --iterations=5
+      - name: Create release checksums
         shell: pwsh
         run: |
-          git diff --exit-code -- wasm/occt-worker.wasm wasm/occt-worker.wasmtime.wasm docs/g0-build.json docs/wasmtime-build.json protocol/artifacts.json protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts ts/src/runtime-manifest.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
           $mainHash = (Get-FileHash wasm/occt-worker.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
           $wasmtimeHash = (Get-FileHash wasm/occt-worker.wasmtime.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
           "$mainHash  occt-worker.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasm.sha256
           "$wasmtimeHash  occt-worker.wasmtime.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasmtime.wasm.sha256
+      - name: Pack npm release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          $packOutput = & npm pack --json --pack-destination release-assets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $pack = ($packOutput -join [Environment]::NewLine | ConvertFrom-Json)[0]
+          $tarball = (Resolve-Path (Join-Path release-assets $pack.filename)).Path
+          $version = node -p "require('./package.json').version"
+          "PACKAGE_TARBALL=$tarball" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_INTEGRITY=$($pack.integrity)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Test packed npm release
+        shell: pwsh
+        run: npm run test:package -- "--tarball=$env:PACKAGE_TARBALL"
       - name: Create corresponding source archive
         shell: pwsh
         run: |
@@ -96,22 +124,12 @@ jobs:
           $emsdkSource = $sources | Where-Object { $_.Path -eq 'vendor/emsdk' }
           $jsonSource = $sources | Where-Object { $_.Path -eq 'vendor/json' }
 
-          Push-Location $stageRoot
-          try {
-            & git apply --directory=occt --check $occtSource.Patch
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            & git apply --directory=occt $occtSource.Patch
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          } finally {
-            Pop-Location
-          }
-
           $projectCommit = (& git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           @"
           occt-worker release: $tag
           occt-worker commit: $projectCommit
-          OCCT $($occtSource.Version) commit: $($occtSource.Commit) (patch applied; patch retained at $($occtSource.Patch))
+          OCCT $($occtSource.Version) commit: $($occtSource.Commit) (unmodified upstream source)
           Emscripten SDK $($emsdkSource.Version) commit: $($emsdkSource.Commit)
           nlohmann/json $($jsonSource.Version) commit: $($jsonSource.Commit)
           npm dependencies: locked by npm-shrinkwrap.json
@@ -122,7 +140,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $sourceHash = (Get-FileHash $sourceAsset -Algorithm SHA256).Hash.ToLowerInvariant()
           "$sourceHash  $archiveBase.tar.gz" | Set-Content -Encoding ascii "$sourceAsset.sha256"
-      - name: Publish GitHub release assets
+      - name: Stage GitHub release assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -143,7 +161,40 @@ jobs:
             "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz.sha256"
           )
           $assets = $fixedAssets + $modularAssets + $sourceAssets
-          gh release create "${{ github.ref_name }}" $assets --generate-notes
-      - run: npm publish --access public --provenance
+          $releaseJson = & gh release view "${{ github.ref_name }}" --json isDraft 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            & gh release create "${{ github.ref_name }}" --draft --generate-notes
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          & gh release upload "${{ github.ref_name }}" @assets --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish npm package
+        shell: pwsh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          $published = $null
+          try {
+            $published = Invoke-RestMethod -Uri "https://registry.npmjs.org/occt-worker/$env:PACKAGE_VERSION"
+          } catch {
+            if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+          }
+          if ($null -eq $published) {
+            & npm publish $env:PACKAGE_TARBALL --access public --provenance --ignore-scripts
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } elseif ($published.dist.integrity -ne $env:PACKAGE_INTEGRITY) {
+            throw "npm package occt-worker@$env:PACKAGE_VERSION already exists with different contents; publish a new version"
+          } else {
+            Write-Output "npm package occt-worker@$env:PACKAGE_VERSION already matches this release"
+          }
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $release = & gh release view "${{ github.ref_name }}" --json isDraft | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($release.isDraft) {
+            & gh release edit "${{ github.ref_name }}" --draft=false
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }

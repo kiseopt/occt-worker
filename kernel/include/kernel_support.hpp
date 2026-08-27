@@ -187,16 +187,6 @@ private:
   int myPreviousStatic;
 };
 
-class XmlXCAFStreamReader : public XmlXCAFDrivers_DocumentRetrievalDriver
-{
-
-public:
-
-void read(Standard_IStream& theStream, const occ::handle<TDocStd_Document>& theDocument, const occ::handle<TDocStd_Application>& theApplication) ;
-
-};;
-
-
 // ---------------------------------------------------------------------------
 // Operation registry: maps protocol operation names to context-based handlers.
 // Registration runs once per process (see runtime/operation_registry.cpp).

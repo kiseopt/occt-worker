@@ -32,7 +32,6 @@
     "scripts",
     "docs",
     "examples",
-    "patches",
     "CMakeLists.txt",
     "package-lock.json",
     "npm-shrinkwrap.json",

@@ -27,25 +27,6 @@ IGESUnitGuard::~IGESUnitGuard()
   UnitsMethods::SetCasCadeLengthUnit(myPrevious);
 }
 
-void XmlXCAFStreamReader::read(Standard_IStream& theStream, const occ::handle<TDocStd_Document>& theDocument, const occ::handle<TDocStd_Application>& theApplication)
-{
-    try
-    {
-      myFileName = "memory.xml";
-      Read(theStream,
-           occ::handle<Storage_Data>(),
-           theDocument,
-           theApplication,
-           occ::handle<PCDM_ReaderFilter>(),
-           Message_ProgressRange());
-    }
-    catch (const Standard_Failure& theFailure)
-    {
-      throw Standard_Failure((std::string("XCAF XML stream parse failed: ")
-                              + theFailure.what()).c_str());
-    }
-  }
-
 } // namespace occt_worker
 
 // The C host bridge exists only in shared Main builds; the standalone full
