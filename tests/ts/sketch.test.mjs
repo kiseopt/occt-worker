@@ -207,34 +207,36 @@ test("sketch rejects invalid inputs and preserves positive radii", async () => {
   );
 
   const client = await DirectClient.create(wasm);
-  const restored = ParametricModel.fromJSON(client, {
-    schemaVersion: 1,
-    parameters: {},
-    features: [{
-      id: "profile",
-      type: "sketch",
-      entities: [
-        { id: "horizontal", type: "line", start: [0, 0], end: [1, 0] },
-        { id: "vertical", type: "line", start: [0, 0], end: [0, 1] },
-      ],
-      constraints: [{ type: "banana", first: "horizontal", second: "vertical" }],
-    }],
-  });
-  await assert.rejects(restored.recompute(), /Unsupported sketch constraint type "banana"/);
-  await restored.dispose();
+  assert.throws(
+    () => ParametricModel.fromJSON(client, {
+      schemaVersion: 1,
+      parameters: {},
+      features: [{
+        id: "profile",
+        type: "sketch",
+        entities: [
+          { id: "horizontal", type: "line", start: [0, 0], end: [1, 0] },
+          { id: "vertical", type: "line", start: [0, 0], end: [0, 1] },
+        ],
+        constraints: [{ type: "banana", first: "horizontal", second: "vertical" }],
+      }],
+    }),
+    /supported sketch constraint type/,
+  );
 
-  const invalidPoint = ParametricModel.fromJSON(client, {
-    schemaVersion: 1,
-    parameters: {},
-    features: [{
-      id: "profile",
-      type: "sketch",
-      entities: [{ id: "line", type: "line", start: [0, 0], end: [1, 0] }],
-      constraints: [{ type: "fixed", point: point("line", "banana"), value: [0, 0] }],
-    }],
-  });
-  await assert.rejects(invalidPoint.recompute(), /Unsupported sketch point reference "banana"/);
-  await invalidPoint.dispose();
+  assert.throws(
+    () => ParametricModel.fromJSON(client, {
+      schemaVersion: 1,
+      parameters: {},
+      features: [{
+        id: "profile",
+        type: "sketch",
+        entities: [{ id: "line", type: "line", start: [0, 0], end: [1, 0] }],
+        constraints: [{ type: "fixed", point: point("line", "banana"), value: [0, 0] }],
+      }],
+    }),
+    /point must be one of start, end, center/,
+  );
   assert.equal((await client.stats()).liveShapeHandles, 0);
 });
 

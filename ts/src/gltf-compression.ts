@@ -1,6 +1,39 @@
 import { KernelError, type BinaryBuffer, type GLTFResolvedBuffer, type JSONObject } from "./types.js";
+import type {
+  DracoAttribute,
+  DracoDecoder,
+  DracoMesh,
+  DracoModule,
+} from "draco3dgltf";
 
-type MutableJSON = Record<string, any>;
+interface MutableJSON {
+  [key: string]: unknown;
+  asset?: MutableJSON;
+  buffers?: MutableJSON[];
+  bufferViews?: MutableJSON[];
+  accessors?: MutableJSON[];
+  meshes?: MutableJSON[];
+  primitives?: MutableJSON[];
+  attributes?: Record<string, number>;
+  targets?: MutableJSON[];
+  extensions?: Record<string, MutableJSON>;
+  extensionsUsed?: unknown[];
+  extensionsRequired?: unknown[];
+  byteLength?: number;
+  byteOffset?: number;
+  byteStride?: number;
+  buffer?: number;
+  bufferView?: number;
+  componentType?: number;
+  count?: number;
+  mode?: string;
+  filter?: string;
+  type?: string;
+  uri?: string;
+  normalized?: boolean;
+  sparse?: unknown;
+  indices?: number;
+}
 
 export interface DecodedGLTF {
   data: ArrayBuffer;
@@ -8,15 +41,26 @@ export interface DecodedGLTF {
   buffers: readonly GLTFResolvedBuffer[];
 }
 
-let dracoDecoderModule: Promise<any> | undefined;
-let meshoptDecoderModule: Promise<any> | undefined;
+type MeshoptDecoder = {
+  ready: Promise<void>;
+  decodeGltfBufferAsync(
+    count: number,
+    stride: number,
+    source: Uint8Array,
+    mode: string,
+    filter?: string,
+  ): Promise<Uint8Array>;
+};
 
-async function loadDracoDecoder(): Promise<any> {
+let dracoDecoderModule: Promise<DracoModule> | undefined;
+let meshoptDecoderModule: Promise<MeshoptDecoder> | undefined;
+
+async function loadDracoDecoder(): Promise<DracoModule> {
   const packageModule = await import("draco3dgltf");
   return packageModule.default.createDecoderModule({});
 }
 
-async function loadMeshoptDecoder(): Promise<any> {
+async function loadMeshoptDecoder(): Promise<MeshoptDecoder> {
   const packageModule = await import("meshoptimizer/decoder");
   return packageModule.MeshoptDecoder;
 }
@@ -99,9 +143,10 @@ function resolveBuffers(
         value = new Uint8Array(resource.slice(0));
       } else if (index === 0 && glbBuffer !== undefined) value = glbBuffer;
       else return failure("glTF buffer has no embedded data");
-      if (!Number.isSafeInteger(definition.byteLength) || definition.byteLength < 0
-          || value.byteLength < definition.byteLength) return failure("glTF buffer is truncated");
-      const exact = value.slice(0, definition.byteLength);
+      const byteLength = definition.byteLength;
+      if (!Number.isSafeInteger(byteLength) || byteLength === undefined || byteLength < 0
+          || value.byteLength < byteLength) return failure("glTF buffer is truncated");
+      const exact = value.slice(0, byteLength);
       result.bytes.push(exact);
       result.publicBuffers.push({
         ...(typeof uri === "string" ? { uri } : {}),
@@ -115,16 +160,19 @@ function resolveBuffers(
 
 function viewBytes(document: MutableJSON, buffers: readonly Uint8Array[], viewIndex: number): Uint8Array {
   const definition = document.bufferViews?.[viewIndex];
-  if (definition === undefined || !Number.isSafeInteger(definition.buffer)
-      || !Number.isSafeInteger(definition.byteLength)) return failure("glTF buffer view is invalid");
-  const buffer = buffers[definition.buffer];
+  const bufferIndex = definition?.buffer;
+  const byteLength = definition?.byteLength;
+  if (definition === undefined || !Number.isSafeInteger(bufferIndex)
+      || bufferIndex === undefined || !Number.isSafeInteger(byteLength)
+      || byteLength === undefined) return failure("glTF buffer view is invalid");
+  const buffer = buffers[bufferIndex];
   if (buffer === undefined) return failure("glTF buffer index is out of range");
   const offset = definition.byteOffset ?? 0;
-  if (!Number.isSafeInteger(offset) || offset < 0 || definition.byteLength < 0
-      || offset > buffer.byteLength || definition.byteLength > buffer.byteLength - offset) {
+  if (!Number.isSafeInteger(offset) || offset < 0 || byteLength < 0
+      || offset > buffer.byteLength || byteLength > buffer.byteLength - offset) {
     return failure("glTF buffer view is truncated");
   }
-  return buffer.subarray(offset, offset + definition.byteLength);
+  return buffer.subarray(offset, offset + byteLength);
 }
 
 function encodeBase64(value: Uint8Array): string {
@@ -139,7 +187,7 @@ function encodeBase64(value: Uint8Array): string {
 function appendBuffer(document: MutableJSON, buffers: Uint8Array[], value: Uint8Array): number {
   const index = buffers.length;
   buffers.push(value);
-  document.buffers.push({
+  (document.buffers ??= []).push({
     byteLength: value.byteLength,
     uri: `data:application/octet-stream;base64,${encodeBase64(value)}`,
   });
@@ -148,9 +196,11 @@ function appendBuffer(document: MutableJSON, buffers: Uint8Array[], value: Uint8
 
 function removeExtensionName(document: MutableJSON, name: string): void {
   for (const key of ["extensionsUsed", "extensionsRequired"]) {
-    if (!Array.isArray(document[key])) continue;
-    document[key] = document[key].filter((value: unknown) => value !== name);
-    if (document[key].length === 0) delete document[key];
+    const extensions = document[key];
+    if (!Array.isArray(extensions)) continue;
+    const filtered = extensions.filter((value: unknown) => value !== name);
+    if (filtered.length === 0) delete document[key];
+    else document[key] = filtered;
   }
 }
 
@@ -161,7 +211,7 @@ async function decodeMeshopt(document: MutableJSON, buffers: Uint8Array[]): Prom
   );
   if (compressed.length === 0) return false;
   meshoptDecoderModule ??= loadMeshoptDecoder();
-  let meshopt: any;
+  let meshopt: MeshoptDecoder;
   try {
     meshopt = await meshoptDecoderModule;
     await meshopt.ready;
@@ -169,16 +219,19 @@ async function decodeMeshopt(document: MutableJSON, buffers: Uint8Array[]): Prom
     return failure("glTF meshopt decoder runtime is unavailable");
   }
   for (const view of compressed) {
-    const extension = view.extensions.EXT_meshopt_compression as MutableJSON;
-    const sourceBuffer = buffers[extension.buffer];
+    const extensions = view.extensions!;
+    const extension = extensions.EXT_meshopt_compression!;
+    const bufferIndex = extension.buffer;
+    const sourceBuffer = bufferIndex === undefined ? undefined : buffers[bufferIndex];
     const offset = extension.byteOffset ?? 0;
     const length = extension.byteLength;
     const count = extension.count;
     const stride = extension.byteStride;
     if (sourceBuffer === undefined || !Number.isSafeInteger(offset) || offset < 0
-        || !Number.isSafeInteger(length) || length < 0 || offset > sourceBuffer.byteLength
-        || length > sourceBuffer.byteLength - offset || !Number.isSafeInteger(count) || count < 0
-        || !Number.isSafeInteger(stride) || stride <= 0 || typeof extension.mode !== "string") {
+        || !Number.isSafeInteger(length) || length === undefined || length < 0 || offset > sourceBuffer.byteLength
+        || length > sourceBuffer.byteLength - offset || !Number.isSafeInteger(count)
+        || count === undefined || count < 0 || !Number.isSafeInteger(stride) || stride === undefined
+        || stride <= 0 || typeof extension.mode !== "string") {
       return failure("glTF meshopt buffer view is invalid");
     }
     let decoded: Uint8Array;
@@ -194,8 +247,8 @@ async function decodeMeshopt(document: MutableJSON, buffers: Uint8Array[]): Prom
     view.byteLength = decoded.byteLength;
     if (extension.mode === "ATTRIBUTES") view.byteStride = stride;
     else delete view.byteStride;
-    delete view.extensions.EXT_meshopt_compression;
-    if (Object.keys(view.extensions).length === 0) delete view.extensions;
+    delete extensions.EXT_meshopt_compression;
+    if (Object.keys(extensions).length === 0) delete view.extensions;
   }
   removeExtensionName(document, "EXT_meshopt_compression");
   return true;
@@ -209,7 +262,13 @@ function accessorComponents(type: unknown): number {
   return failure("glTF Draco attribute accessor type is unsupported");
 }
 
-function dracoFloatAttribute(module: any, decoder: any, mesh: any, attribute: any, count: number): Float32Array {
+function dracoFloatAttribute(
+  module: DracoModule,
+  decoder: DracoDecoder,
+  mesh: DracoMesh,
+  attribute: DracoAttribute,
+  count: number,
+): Float32Array {
   const values = new module.DracoFloat32Array();
   try {
     if (!decoder.GetAttributeFloatForAllPoints(mesh, attribute, values) || values.size() !== count) {
@@ -230,15 +289,17 @@ async function decodeDraco(document: MutableJSON, buffers: Uint8Array[]): Promis
     : []);
   if (primitives.length === 0) return false;
   dracoDecoderModule ??= loadDracoDecoder();
-  let module: any;
+  let module: DracoModule;
   try {
     module = await dracoDecoderModule;
   } catch {
     return failure("glTF Draco decoder runtime is unavailable");
   }
   for (const primitive of primitives) {
-    const extension = primitive.extensions.KHR_draco_mesh_compression as MutableJSON;
-    if (!Number.isSafeInteger(extension.bufferView) || extension.bufferView < 0
+    const extensions = primitive.extensions!;
+    const extension = extensions.KHR_draco_mesh_compression!;
+    if (!Number.isSafeInteger(extension.bufferView) || extension.bufferView === undefined
+        || extension.bufferView < 0
         || extension.attributes === null || typeof extension.attributes !== "object") {
       return failure("glTF Draco primitive is invalid");
     }
@@ -255,10 +316,13 @@ async function decodeDraco(document: MutableJSON, buffers: Uint8Array[]): Promis
       if (!status.ok() || mesh.ptr === 0) return failure(`glTF Draco primitive could not be decoded: ${status.error_msg()}`);
       const pointCount = mesh.num_points();
       const faceCount = mesh.num_faces();
-      for (const [semantic, uniqueId] of Object.entries(extension.attributes)) {
+      for (const [semantic, uniqueIdValue] of Object.entries(extension.attributes)) {
+        const uniqueId = typeof uniqueIdValue === "number" ? uniqueIdValue : NaN;
         const oldAccessorIndex = primitive.attributes?.[semantic];
-        const oldAccessor = document.accessors?.[oldAccessorIndex];
-        if (!Number.isSafeInteger(uniqueId) || oldAccessor === undefined) {
+        const oldAccessor = oldAccessorIndex === undefined
+          ? undefined : document.accessors?.[oldAccessorIndex];
+        if (!Number.isSafeInteger(uniqueId) || oldAccessorIndex === undefined
+            || oldAccessor === undefined) {
           return failure("glTF Draco attribute definition is invalid");
         }
         const attribute = decoder.GetAttributeByUniqueId(mesh, uniqueId);
@@ -280,7 +344,9 @@ async function decodeDraco(document: MutableJSON, buffers: Uint8Array[]): Promis
           componentType = 5123;
         } else bytes = new Uint8Array(floats.buffer);
         const buffer = appendBuffer(document, buffers, bytes);
-        const bufferView = document.bufferViews.push({ buffer, byteOffset: 0, byteLength: bytes.byteLength }) - 1;
+        const bufferView = (document.bufferViews ??= []).push({
+          buffer, byteOffset: 0, byteLength: bytes.byteLength,
+        }) - 1;
         const accessor = {
           ...oldAccessor,
           bufferView,
@@ -290,7 +356,7 @@ async function decodeDraco(document: MutableJSON, buffers: Uint8Array[]): Promis
         };
         delete accessor.sparse;
         delete accessor.normalized;
-        primitive.attributes[semantic] = document.accessors.push(accessor) - 1;
+        primitive.attributes![semantic] = (document.accessors ??= []).push(accessor) - 1;
       }
       const indices = new Uint32Array(faceCount * 3);
       const face = new module.DracoInt32Array();
@@ -306,9 +372,12 @@ async function decodeDraco(document: MutableJSON, buffers: Uint8Array[]): Promis
       }
       const indexBytes = new Uint8Array(indices.buffer);
       const indexBuffer = appendBuffer(document, buffers, indexBytes);
-      const indexView = document.bufferViews.push({ buffer: indexBuffer, byteOffset: 0, byteLength: indexBytes.byteLength }) - 1;
-      const oldIndexAccessor = document.accessors?.[primitive.indices] ?? { type: "SCALAR" };
-      primitive.indices = document.accessors.push({
+      const indexView = (document.bufferViews ??= []).push({
+        buffer: indexBuffer, byteOffset: 0, byteLength: indexBytes.byteLength,
+      }) - 1;
+      const oldIndexAccessor = primitive.indices === undefined
+        ? { type: "SCALAR" } : document.accessors?.[primitive.indices] ?? { type: "SCALAR" };
+      primitive.indices = (document.accessors ??= []).push({
         ...oldIndexAccessor,
         bufferView: indexView,
         byteOffset: 0,
@@ -316,8 +385,8 @@ async function decodeDraco(document: MutableJSON, buffers: Uint8Array[]): Promis
         count: indices.length,
         type: "SCALAR",
       }) - 1;
-      delete primitive.extensions.KHR_draco_mesh_compression;
-      if (Object.keys(primitive.extensions).length === 0) delete primitive.extensions;
+      delete extensions.KHR_draco_mesh_compression;
+      if (Object.keys(extensions).length === 0) delete primitive.extensions;
     } finally {
       module.destroy(mesh);
       module.destroy(decoder);

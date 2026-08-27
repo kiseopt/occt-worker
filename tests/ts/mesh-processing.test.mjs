@@ -224,3 +224,18 @@ test("boundary processing rejects non-manifold and non-planar input", () => {
   };
   assert.throws(() => fillPlanarHoles(warped, { planarityTolerance: 1e-4 }), /not planar/);
 });
+
+test("mesh processing rejects non-finite attributes at its boundary", () => {
+  const mesh = duplicatedQuad();
+  mesh.positions[0] = Number.NaN;
+  assert.throws(() => weldTessellation(mesh), /finite/);
+
+  const uvMesh = duplicatedQuad();
+  uvMesh.uvs[0] = Number.POSITIVE_INFINITY;
+  assert.throws(() => generateTangents(uvMesh), /finite/);
+
+  assert.throws(() => new EdgeSelectionMap({
+    positions: new Float32Array([0, 0, 0, Number.NaN, 0, 0]),
+    edgeGroups: new Uint32Array([0, 0, 2]),
+  }), /finite/);
+});

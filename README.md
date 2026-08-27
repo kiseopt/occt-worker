@@ -13,7 +13,7 @@ for Node.js and browser Workers.
 
 [中文说明](README.zh-CN.md) · [Documentation](docs/README.md) · [API reference](docs/api.md) · [Capability matrix](docs/capabilities.md)
 
-**Current release:** `v1.0.0` · **Runtime:** Node.js `>=20` · **License:** Apache-2.0 for
+**Current release:** `v1.2.0` · **Runtime:** Node.js `>=20` · **License:** Apache-2.0 for
 project code; see the distribution notices for OCCT and other third-party components.
 
 This is an independent project. It is not affiliated with, endorsed by, or sponsored
@@ -42,6 +42,13 @@ Node.js 20 or newer is required:
 ```sh
 npm install occt-worker
 ```
+
+> **Package size vs. download size.** The npm package ships the full kernel WASM, the JS
+> runtime, types, and protocol manifests; installing it does not benefit from runtime
+> lazy-loading. Browser first-use downloads are a different metric: Side/Profile
+> artifacts (stage-4 shared/isolated architecture) resolve lazily from Release/CDN via
+> `resolveArtifact({ name })` with an optional `baseUrl` or fully custom resolver for
+> private deployments.
 
 ## Quick start
 
@@ -81,6 +88,16 @@ Runtimes that implement `AsyncDisposable` can use
 | Low-level messages, buffers, errors, and defaults | `request()` and protocol frames | [Protocol specification](docs/protocol.md) |
 | Wasmtime or custom host integration | Synchronous WebAssembly ABI | [Host support](docs/hosts.md) |
 | Parametric features and sketches | `ParametricModel` and feature definitions | [TypeScript API](docs/api.md) |
+| Shared Main/Side high-level compatibility | `SharedClient` + `EngineCompatClient` | [TypeScript API](docs/api.md) |
+
+For an isolated profile, resolve its manifest descriptor and provide a Worker factory to
+`createWorkerProfileRuntime`. The helper verifies the artifact before starting the worker;
+register the resulting factory with `GeometryEngine` for lazy profile startup. Profile and
+shared Side binaries are release artifacts, not files in the npm tarball. The tag-based release
+workflow builds and uploads them to the matching GitHub Release and updates `protocol/artifacts.json`
+with versioned URLs and SHA-256 values. Use `SharedClient` with `EngineCompatClient` when the legacy
+high-level API should run on Main/Side; private mirrors can use `baseUrl`, `defaultBase`, or `resolve`
+without maintaining a project CDN.
 
 ## Support matrix
 

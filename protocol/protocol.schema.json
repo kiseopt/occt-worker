@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://occt-worker.dev/protocol/1.0.0/schema.json",
-  "title": "occt-worker protocol v1.0.0",
+  "$id": "https://occt-worker.dev/protocol/1.2.0/schema.json",
+  "title": "occt-worker protocol v1.2.0",
   "$defs": {
     "error": {
       "type": "object",
@@ -19,6 +19,7 @@
             "TessellationFailed",
             "ImportExportFailed",
             "HealingFailed",
+            "Cancelled",
             "InvalidHandle",
             "InvalidArgs",
             "OutOfMemory",
@@ -36,7 +37,15 @@
       "type": "integer",
       "minimum": 0
     },
-    "handle": {
+    "shapeHandle": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "scopeHandle": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "bufferHandle": {
       "type": "integer",
       "minimum": 1
     },
@@ -77,6 +86,37 @@
     },
     "string": {
       "type": "string"
+    },
+    "jsonValue": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        },
+        {
+          "$ref": "#/$defs/jsonObject"
+        }
+      ]
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      }
     },
     "vec3": {
       "type": "array",
@@ -233,7 +273,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "name": {
           "$ref": "#/$defs/string"
@@ -520,7 +560,7 @@
           ]
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "name": {
           "$ref": "#/$defs/string"
@@ -577,7 +617,7 @@
           ]
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "name": {
           "$ref": "#/$defs/string"
@@ -630,7 +670,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "rootCount": {
           "$ref": "#/$defs/uint"
@@ -777,10 +817,10 @@
         "$ref": "#/$defs/uint"
       }
     },
-    "handleArray": {
+    "shapeHandleArray": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/handle"
+        "$ref": "#/$defs/shapeHandle"
       }
     },
     "unit": {
@@ -848,7 +888,7 @@
           "$ref": "#/$defs/uint"
         },
         "support": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "continuity": {
           "enum": [
@@ -922,7 +962,7 @@
       "additionalProperties": false,
       "properties": {
         "bufferId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/bufferHandle"
         },
         "byteOffset": {
           "$ref": "#/$defs/uint"
@@ -942,7 +982,7 @@
       "additionalProperties": false,
       "properties": {
         "bufferId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/bufferHandle"
         },
         "byteLength": {
           "$ref": "#/$defs/uint"
@@ -1089,7 +1129,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -1102,7 +1142,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "maxError": {
           "$ref": "#/$defs/number"
@@ -1117,7 +1157,7 @@
       "additionalProperties": false,
       "properties": {
         "shapes": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         }
       }
     },
@@ -1130,10 +1170,10 @@
       "additionalProperties": false,
       "properties": {
         "visible": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "hidden": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -1260,7 +1300,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "history": {
           "$ref": "#/$defs/history"
@@ -1399,7 +1439,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferDescriptor"
@@ -1454,7 +1494,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferDescriptor"
@@ -1484,7 +1524,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferDescriptor"
@@ -1623,7 +1663,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferDescriptor"
@@ -1788,7 +1828,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferDescriptor"
@@ -1803,7 +1843,7 @@
           "$ref": "#/$defs/bufferDescriptor"
         },
         "document": {
-          "type": "object"
+          "$ref": "#/$defs/jsonObject"
         },
         "activeScene": {
           "$ref": "#/$defs/uint"
@@ -1859,7 +1899,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -2371,7 +2411,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "points": {
           "oneOf": [
@@ -2415,7 +2455,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "points": {
           "$ref": "#/$defs/vec3Grid"
@@ -2452,7 +2492,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "ops": {
           "type": "array",
@@ -2500,7 +2540,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -2517,7 +2557,7 @@
       ],
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         }
       },
       "additionalProperties": false
@@ -2532,13 +2572,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "base": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tools": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "includeHistory": {
           "$ref": "#/$defs/boolean"
@@ -2558,13 +2598,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "base": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tools": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "includeHistory": {
           "$ref": "#/$defs/boolean"
@@ -2584,13 +2624,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "base": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tools": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "includeHistory": {
           "$ref": "#/$defs/boolean"
@@ -2609,7 +2649,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "point": {
           "$ref": "#/$defs/vec3"
@@ -2686,10 +2726,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "parameterization": {
           "enum": [
@@ -2713,10 +2753,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tolerance": {
           "$ref": "#/$defs/positiveNumber"
@@ -2749,7 +2789,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -2761,7 +2801,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -2773,7 +2813,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -2785,7 +2825,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -2801,10 +2841,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "origin": {
           "$ref": "#/$defs/vec3"
@@ -2859,6 +2899,7 @@
             }
           },
           "required": [
+            "mode",
             "length"
           ]
         },
@@ -2869,6 +2910,7 @@
             }
           },
           "required": [
+            "mode",
             "from",
             "to"
           ]
@@ -2888,10 +2930,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "action": {
           "enum": [
@@ -2981,6 +3023,16 @@
         {
           "properties": {
             "action": {
+              "enum": [
+                "setPeriodic",
+                "setNotPeriodic"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "action": {
               "const": "setControlNet"
             }
           },
@@ -3003,10 +3055,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "action": {
           "enum": [
@@ -3157,6 +3209,21 @@
         {
           "properties": {
             "action": {
+              "enum": [
+                "setUPeriodic",
+                "setVPeriodic",
+                "setUNotPeriodic",
+                "setVNotPeriodic",
+                "exchangeUV",
+                "reverseU",
+                "reverseV"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "action": {
               "const": "setControlNet"
             }
           },
@@ -3177,7 +3244,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         }
       }
     },
@@ -3193,7 +3260,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "parameter": {
           "$ref": "#/$defs/number"
@@ -3216,7 +3283,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "u": {
           "$ref": "#/$defs/number"
@@ -3240,7 +3307,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -3253,10 +3320,10 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "document": {
-          "type": "object"
+          "$ref": "#/$defs/jsonObject"
         },
         "buffers": {
           "type": "array",
@@ -3338,12 +3405,12 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "shapes": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/handle"
+            "$ref": "#/$defs/shapeHandle"
           },
           "minItems": 1
         },
@@ -3402,7 +3469,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferRef"
@@ -3462,7 +3529,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferRef"
@@ -3522,12 +3589,12 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "shapes": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/handle"
+            "$ref": "#/$defs/shapeHandle"
           },
           "minItems": 1
         },
@@ -3625,7 +3692,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferRef"
@@ -3738,10 +3805,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "point": {
           "$ref": "#/$defs/vec3"
@@ -3769,10 +3836,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "length": {
           "$ref": "#/$defs/positiveNumber"
@@ -3805,7 +3872,7 @@
       "additionalProperties": false,
       "properties": {
         "bufferId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/bufferHandle"
         }
       }
     },
@@ -3823,10 +3890,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "type": {
           "$ref": "#/$defs/topologyType"
@@ -3847,7 +3914,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "type": {
           "$ref": "#/$defs/topologyType"
@@ -3891,10 +3958,10 @@
       "additionalProperties": false,
       "properties": {
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -3906,7 +3973,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "geomControls": {
           "$ref": "#/$defs/boolean"
@@ -3929,10 +3996,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "faceIndices": {
           "type": "array",
@@ -3963,10 +4030,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "faceIndices": {
           "type": "array",
@@ -4015,10 +4082,10 @@
       "additionalProperties": false,
       "properties": {
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -4034,10 +4101,10 @@
       "additionalProperties": false,
       "properties": {
         "curve": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "surface": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -4053,10 +4120,10 @@
       "additionalProperties": false,
       "properties": {
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -4073,10 +4140,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "vector": {
           "$ref": "#/$defs/vec3"
@@ -4100,10 +4167,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "edgeIndices": {
           "$ref": "#/$defs/uintArray"
@@ -4148,10 +4215,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "precision": {
           "$ref": "#/$defs/positiveNumber"
@@ -4173,10 +4240,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shapes": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "fuzzyValue": {
           "$ref": "#/$defs/number"
@@ -4203,10 +4270,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "matrix": {
           "$ref": "#/$defs/matrix12"
@@ -4227,7 +4294,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "from": {
           "enum": [
@@ -4405,13 +4472,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "newShape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "baseShape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "faceBindings": {
           "type": "array",
@@ -4441,10 +4508,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "thickness": {
           "$ref": "#/$defs/number"
@@ -4472,7 +4539,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4491,7 +4558,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4572,7 +4639,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4591,10 +4658,10 @@
       ],
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "shapes": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "rootCount": {
           "$ref": "#/$defs/uint"
@@ -4611,7 +4678,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4633,7 +4700,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4681,7 +4748,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4710,7 +4777,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4729,10 +4796,10 @@
       ],
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "shapes": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "rootCount": {
           "$ref": "#/$defs/uint"
@@ -4749,7 +4816,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4771,7 +4838,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4800,7 +4867,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4829,7 +4896,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "data": {
           "$ref": "#/$defs/bufferRef"
@@ -4850,7 +4917,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -4867,13 +4934,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tolerance": {
           "$ref": "#/$defs/positiveNumber"
@@ -4892,10 +4959,10 @@
       "additionalProperties": false,
       "properties": {
         "curve": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "surface": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tolerance": {
           "$ref": "#/$defs/positiveNumber"
@@ -4915,13 +4982,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tolerance": {
           "$ref": "#/$defs/positiveNumber"
@@ -4940,10 +5007,10 @@
       "additionalProperties": false,
       "properties": {
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -4967,7 +5034,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -4992,7 +5059,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "size": {
           "$ref": "#/$defs/vec3"
@@ -5014,12 +5081,12 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "solids": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/handle"
+            "$ref": "#/$defs/shapeHandle"
           },
           "minItems": 1
         }
@@ -5037,12 +5104,12 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shapes": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/handle"
+            "$ref": "#/$defs/shapeHandle"
           },
           "minItems": 1
         }
@@ -5062,7 +5129,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "radius1": {
           "$ref": "#/$defs/number"
@@ -5094,7 +5161,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "radius": {
           "$ref": "#/$defs/positiveNumber"
@@ -5121,7 +5188,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "start": {
           "$ref": "#/$defs/vec3"
@@ -5182,7 +5249,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "poles": {
           "oneOf": [
@@ -5211,7 +5278,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "poles": {
           "oneOf": [
@@ -5261,7 +5328,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "radius": {
           "$ref": "#/$defs/positiveNumber"
@@ -5287,7 +5354,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "majorRadius": {
           "$ref": "#/$defs/positiveNumber"
@@ -5317,7 +5384,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "radius": {
           "$ref": "#/$defs/positiveNumber"
@@ -5357,7 +5424,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "majorRadius": {
           "$ref": "#/$defs/positiveNumber"
@@ -5395,7 +5462,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "start": {
           "$ref": "#/$defs/vec3"
@@ -5419,10 +5486,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "offset": {
           "$ref": "#/$defs/number"
@@ -5446,7 +5513,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "focal": {
           "$ref": "#/$defs/positiveNumber"
@@ -5480,13 +5547,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "outer": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "holes": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         }
       }
     },
@@ -5503,16 +5570,16 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "surface": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "outer": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "holes": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "tolerance": {
           "$ref": "#/$defs/positiveNumber"
@@ -5532,10 +5599,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "face": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "referencePoint": {
           "$ref": "#/$defs/vec3"
@@ -5554,7 +5621,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "points": {
           "$ref": "#/$defs/vec3Array"
@@ -5576,7 +5643,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "poles": {
           "$ref": "#/$defs/vec3Grid"
@@ -5601,7 +5668,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "poles": {
           "$ref": "#/$defs/vec3Grid"
@@ -5653,10 +5720,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "profile": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "direction": {
           "$ref": "#/$defs/vec3"
@@ -5688,7 +5755,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "surface": {
           "$ref": "#/$defs/analyticSurface"
@@ -5722,10 +5789,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "boundary": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "points": {
           "type": "array",
@@ -5784,10 +5851,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "offset": {
           "$ref": "#/$defs/number"
@@ -5809,10 +5876,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "profile": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "origin": {
           "$ref": "#/$defs/vec3"
@@ -5841,13 +5908,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -5863,12 +5930,12 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "faces": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/handle"
+            "$ref": "#/$defs/shapeHandle"
           },
           "minItems": 1
         }
@@ -5886,10 +5953,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shell": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -5905,7 +5972,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "radius": {
           "$ref": "#/$defs/positiveNumber"
@@ -5931,7 +5998,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "majorRadius": {
           "$ref": "#/$defs/positiveNumber"
@@ -5959,7 +6026,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "point": {
           "$ref": "#/$defs/vec3"
@@ -5979,7 +6046,7 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "size": {
           "$ref": "#/$defs/vec3"
@@ -6007,10 +6074,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "edges": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         }
       }
     },
@@ -6025,7 +6092,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "kind": {
           "enum": [
@@ -6073,16 +6140,16 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "start": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "end": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -6098,12 +6165,12 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "sections": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/handle"
+            "$ref": "#/$defs/shapeHandle"
           },
           "minItems": 2
         },
@@ -6135,10 +6202,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "base": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "faceIndices": {
           "type": "array",
@@ -6155,10 +6222,10 @@
           "$ref": "#/$defs/positiveNumber"
         },
         "until": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "from": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "mode": {
           "enum": [
@@ -6259,10 +6326,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "base": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "faceIndices": {
           "type": "array",
@@ -6282,10 +6349,10 @@
           "$ref": "#/$defs/number"
         },
         "until": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "from": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "mode": {
           "enum": [
@@ -6364,13 +6431,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "base": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "profile": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "planeOrigin": {
           "$ref": "#/$defs/vec3"
@@ -6420,13 +6487,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "base": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "profile": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "planeOrigin": {
           "$ref": "#/$defs/vec3"
@@ -6470,7 +6537,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "useTriangulation": {
           "$ref": "#/$defs/boolean"
@@ -6493,10 +6560,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "offset": {
           "$ref": "#/$defs/number"
@@ -6522,10 +6589,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "wire": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "offset": {
           "$ref": "#/$defs/number"
@@ -6562,7 +6629,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "point": {
           "$ref": "#/$defs/vec3"
@@ -6581,7 +6648,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "point": {
           "$ref": "#/$defs/vec3"
@@ -6602,7 +6669,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -6629,10 +6696,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "first": {
           "$ref": "#/$defs/number"
@@ -6658,10 +6725,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "uFirst": {
           "$ref": "#/$defs/number"
@@ -6693,10 +6760,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "degree": {
           "$ref": "#/$defs/uint"
@@ -6726,10 +6793,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "uDegree": {
           "$ref": "#/$defs/uint"
@@ -6765,10 +6832,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "origin": {
           "$ref": "#/$defs/vec3"
@@ -6797,13 +6864,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -6820,13 +6887,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "first": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "second": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "approximation": {
           "$ref": "#/$defs/boolean"
@@ -6850,10 +6917,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "direction": {
           "$ref": "#/$defs/vec3"
@@ -6884,7 +6951,10 @@
             "projection": {
               "const": "parallel"
             }
-          }
+          },
+          "required": [
+            "projection"
+          ]
         },
         {
           "properties": {
@@ -6893,6 +6963,7 @@
             }
           },
           "required": [
+            "projection",
             "focus"
           ]
         }
@@ -6911,12 +6982,12 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shapes": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/handle"
+            "$ref": "#/$defs/shapeHandle"
           },
           "minItems": 2
         },
@@ -6985,10 +7056,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tolerance": {
           "$ref": "#/$defs/positiveNumber"
@@ -7015,10 +7086,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shapes": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "tolerance": {
           "$ref": "#/$defs/positiveNumber"
@@ -7037,7 +7108,7 @@
       ],
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "freeEdges": {
           "$ref": "#/$defs/uint"
@@ -7059,7 +7130,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -7084,13 +7155,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "objects": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "tools": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "fuzzyValue": {
           "$ref": "#/$defs/number"
@@ -7139,13 +7210,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "spine": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "profile": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "includeHistory": {
           "$ref": "#/$defs/boolean"
@@ -7163,7 +7234,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -7175,7 +7246,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -7187,7 +7258,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -7199,7 +7270,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -7214,10 +7285,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "surface": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "direction": {
           "enum": [
@@ -7246,13 +7317,13 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "spine": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "profiles": {
-          "$ref": "#/$defs/handleArray"
+          "$ref": "#/$defs/shapeHandleArray"
         },
         "mode": {
           "enum": [
@@ -7266,7 +7337,7 @@
           "$ref": "#/$defs/axis"
         },
         "auxiliarySpine": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "curvilinearEquivalence": {
           "$ref": "#/$defs/boolean"
@@ -7287,7 +7358,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "linearDeflection": {
           "$ref": "#/$defs/positiveNumber"
@@ -7314,7 +7385,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "linearDeflection": {
           "$ref": "#/$defs/positiveNumber"
@@ -7335,7 +7406,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         }
       }
     },
@@ -7387,7 +7458,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "includeUV": {
           "$ref": "#/$defs/boolean"
@@ -7408,10 +7479,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/vec3Array"
@@ -7438,7 +7509,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "tolerance": {
           "$ref": "#/$defs/positiveNumber"
@@ -7520,10 +7591,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "linearDeflection": {
           "$ref": "#/$defs/positiveNumber"
@@ -7546,7 +7617,7 @@
       ],
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "faces": {
           "$ref": "#/$defs/uint"
@@ -7569,10 +7640,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "matrix": {
           "$ref": "#/$defs/matrix12"
@@ -7614,10 +7685,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "first": {
           "$ref": "#/$defs/number"
@@ -7643,10 +7714,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "uFirst": {
           "$ref": "#/$defs/number"
@@ -7677,10 +7748,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "unifyEdges": {
           "$ref": "#/$defs/boolean"
@@ -7710,10 +7781,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "index": {
           "$ref": "#/$defs/uint"
@@ -7741,10 +7812,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "uIndex": {
           "$ref": "#/$defs/uint"
@@ -7777,10 +7848,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "mode": {
           "enum": [
@@ -7789,7 +7860,7 @@
           ]
         },
         "count": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/uint"
         },
         "translation": {
           "$ref": "#/$defs/vec3"
@@ -7837,7 +7908,7 @@
       "additionalProperties": false,
       "properties": {
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "positions": {
           "$ref": "#/$defs/bufferRef"
@@ -7898,10 +7969,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "edgeIndices": {
           "$ref": "#/$defs/uintArray"
@@ -7947,10 +8018,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "mode": {
           "enum": [
@@ -8205,10 +8276,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "translation": {
           "$ref": "#/$defs/vec3"
@@ -8231,10 +8302,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "rotation": {
           "$ref": "#/$defs/rotation"
@@ -8257,10 +8328,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "factor": {
           "$ref": "#/$defs/number"
@@ -8286,10 +8357,10 @@
       "additionalProperties": false,
       "properties": {
         "scopeId": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/scopeHandle"
         },
         "shape": {
-          "$ref": "#/$defs/handle"
+          "$ref": "#/$defs/shapeHandle"
         },
         "normal": {
           "$ref": "#/$defs/vec3"

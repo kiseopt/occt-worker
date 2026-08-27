@@ -10,32 +10,23 @@ $buildRoot = Join-Path $repo "build/$($Configuration.ToLowerInvariant())"
 $occtBuild = Join-Path $buildRoot 'occt-build'
 $occtInstall = Join-Path $buildRoot 'occt-install'
 $kernelBuild = Join-Path $buildRoot 'kernel'
-$occtCxxFlags = '-fwasm-exceptions -ffp-contract=off -UOCC_CONVERT_SIGNALS'
-$emsdkVersion = '4.0.23'
+. (Join-Path $PSScriptRoot 'build-config.ps1')
+$buildConfig = Get-OcctWasmBuildConfig
+$occtCMakeArguments = $buildConfig.OcctCMakeArguments
 
 $toolPaths = & (Join-Path $repo 'scripts/bootstrap-tools.ps1')
 $env:PATH = (($toolPaths | Where-Object { $_ }) -join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $env:PATH
 $emsdkCommand = Join-Path $emsdk 'emsdk.ps1'
 if (-not (Test-Path (Join-Path $emsdk 'upstream/emscripten/emcc.py'))) {
-  & $emsdkCommand install $emsdkVersion
+  & $emsdkCommand install $buildConfig.EmsdkVersion
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
-& $emsdkCommand activate $emsdkVersion
+& $emsdkCommand activate $buildConfig.EmsdkVersion
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $emsdk 'emsdk_env.ps1') | Out-Null
 node (Join-Path $repo 'scripts/apply-occt-patches.mjs')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 node (Join-Path $repo 'scripts/generate-protocol.mjs')
-
-$moduleFlags = @(
-  '-DBUILD_MODULE_FoundationClasses=OFF',
-  '-DBUILD_MODULE_ModelingData=OFF',
-  '-DBUILD_MODULE_ModelingAlgorithms=ON',
-  '-DBUILD_MODULE_Visualization=OFF',
-  '-DBUILD_MODULE_ApplicationFramework=OFF',
-  '-DBUILD_MODULE_DataExchange=OFF',
-  '-DBUILD_MODULE_Draw=OFF'
-)
 
 # -UOCC_CONVERT_SIGNALS: OCC_CATCH_SIGNALS must not expand to setjmp. This kernel never installs
 # signal handlers, and Emscripten lowers setjmp through wasm-EH in a way that emits br_table
@@ -43,13 +34,8 @@ $moduleFlags = @(
 & emcmake cmake -S (Join-Path $repo 'occt') -B $occtBuild -G Ninja `
   "-DCMAKE_BUILD_TYPE=$Configuration" `
   "-DCMAKE_INSTALL_PREFIX=$occtInstall" `
-  '-DBUILD_LIBRARY_TYPE=Static' `
-  '-DBUILD_RELEASE_DISABLE_EXCEPTIONS=OFF' `
-  '-DBUILD_ADDITIONAL_TOOLKITS=TKPrim;TKBO;TKBool;TKMesh;TKFillet;TKOffset;TKXSBase;TKDESTEP;TKDEIGES;TKDESTL;TKDEVRML;TKBinXCAF;TKXmlXCAF' `
-  '-DBUILD_DOC_Overview=OFF' '-DBUILD_DOC_RefMan=OFF' '-DBUILD_GTEST=OFF' `
-  '-DUSE_TBB=OFF' '-DUSE_OPENGL=OFF' '-DUSE_GLES2=OFF' '-DUSE_FREETYPE=OFF' `
-  "-DCMAKE_CXX_FLAGS=$occtCxxFlags" `
-  @moduleFlags
+  "-DCMAKE_CXX_FLAGS=$($buildConfig.OcctCxxFlags -join ' ')" `
+  @occtCMakeArguments
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & cmake --build $occtBuild --target install --parallel
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

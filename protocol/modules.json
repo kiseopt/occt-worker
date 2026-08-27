@@ -1,0 +1,143 @@
+{
+  "description": "Declarative mapping between protocol operations, semantic modules, artifact module candidates, and profiles. Machine-checked by scripts/verify-modules.mjs.",
+  "transferOperations": ["importBREP", "exportBREP"],
+  "operationPolicies": {
+    "cooperativeCancellation": [
+      "tessellate", "tessellateEdges",
+      "exportVRML", "importVRML", "exportSTL", "importSTL",
+      "exportOBJ", "importOBJ", "exportPLY", "importPLY", "exportGLTF", "importGLTF",
+      "exportIGES", "importIGES", "exportSTEP", "importSTEP",
+      "exportSTEPDocument", "importSTEPDocument", "exportIGESDocument", "importIGESDocument"
+    ],
+    "failureCodes": {
+      "BooleanFailed": [
+        "booleanCut", "booleanFuse", "booleanCommon", "generalFuse",
+        "selectGeneralFuseCells", "section", "split", "defeature"
+      ],
+      "FilletFailed": ["fillet", "chamfer"],
+      "TessellationFailed": [
+        "tessellate", "tessellateEdges", "triangulationData", "validateTriangulation"
+      ],
+      "HealingFailed": [
+        "repairTriangulation", "hollow", "offsetShape", "sew", "fixShape",
+        "unifySameDomain", "shapeUpgrade"
+      ],
+      "ImportExportFailed": [
+        "exportIGES", "importIGES", "exportSTEP", "importSTEP",
+        "exportSTEPDocument", "importSTEPDocument", "exportIGESDocument", "importIGESDocument",
+        "exportXCAF", "importXCAF", "exportBREP", "importBREP", "exportSTL", "importSTL",
+        "exportGLTF", "importGLTF", "exportVRML", "importVRML", "exportOBJ", "importOBJ",
+        "exportPLY", "importPLY"
+      ],
+      "ConstructionFailed": [
+        "replaceTriangulation", "approximateCurveBSpline", "approximateSurfaceBSpline",
+        "reduceCurveDegree", "reduceSurfaceDegree", "extendCurve", "extendSurface",
+        "makeBox", "makeCylinder", "makeSphere", "makeCone", "makeTorus", "makeWedge",
+        "makeHalfSpace", "makeVertex", "makePolygon", "makeWire", "makeFace", "makeCompound",
+        "makeShell", "makeCompSolid", "makeSurfaceFace", "makeSurfaceBezier",
+        "makeSurfaceBSpline", "makeSurfaceExtrusion", "makeSurfaceOffset",
+        "makeSurfaceRevolution", "makeSurfaceRuled", "surfaceIsoCurve", "makeSolidFromShell",
+        "makeEdgeArc", "makeEdgeBezier", "makeEdgeBSpline", "makeEdgeCircle", "makeEdgeEllipse",
+        "makeEdgeHelix", "makeEdgeHyperbola", "makeEdgeLine", "makeEdgeOffset", "makeEdgeParabola",
+        "trimCurve", "trimSurface", "convertCurveToBSpline", "convertSurfaceToBSpline",
+        "updateCurvePole", "updateSurfacePole", "extrude", "revolve", "loft", "draftAngle",
+        "localPrism", "localRevolution", "linearForm", "cylindricalHole", "sweepPipe",
+        "sweepPipeShell", "offsetWire2D", "transform", "generalTransform", "batchTransformCopy",
+        "translate", "rotate", "scale", "mirror"
+      ]
+    },
+    "documentDispatch": {
+      "exportOBJ": { "argument": "positions", "kind": "obj" },
+      "exportGLTF": { "argument": "document", "kind": "gltf" }
+    }
+  },
+  "semanticModules": {
+    "runtime": [
+      "capabilities", "beginScope", "endScope", "release", "releaseAll",
+      "createBuffer", "freeBuffer", "stats", "batch"
+    ],
+    "geometry-topology": [
+      "approximateCurveBSpline", "approximateSurfaceBSpline", "convertCurveToBSpline", "convertSurfaceToBSpline",
+      "curveContinuity", "curveControlData", "curveDomain", "curveGeometry",
+      "editCurveBSpline", "editSurfaceBSpline", "evaluateCurve", "evaluateSurface",
+      "extendCurve", "extendSurface", "reparameterizeCurve", "reparameterizeSurface",
+      "reduceCurveDegree", "reduceSurfaceDegree", "trimCurve", "trimSurface",
+      "updateCurvePole", "updateSurfacePole", "surfaceContinuity", "surfaceControlData",
+      "surfaceDomain", "surfaceGeometry", "surfaceIsoCurve",
+      "makeEdgeArc", "makeEdgeBezier", "makeEdgeBSpline", "makeEdgeCircle",
+      "makeEdgeEllipse", "makeEdgeHelix", "makeEdgeHyperbola", "makeEdgeLine",
+      "makeEdgeOffset", "makeEdgeParabola",
+      "makeVertex", "makeWire", "makePolygon", "makeFace", "makeFaceOnSurface",
+      "makeSurfaceBezier", "makeSurfaceBSpline", "makeSurfaceExtrusion", "makeSurfaceFace",
+      "makeSurfaceFilling", "makeSurfaceOffset", "makeSurfaceRevolution", "makeSurfaceRuled",
+      "getSubShape", "getSubShapes", "shapeType", "topologyCounts", "getAdjacency", "isSameShape",
+      "inspectTolerances", "setTolerance", "isValid", "diagnoseShape", "bbox", "obb"
+    ],
+    "modeling": [
+      "makeBox", "makeCone", "makeCylinder", "makeSphere", "makeTorus", "makeWedge",
+      "makeShell", "makeSolidFromShell", "makeCompSolid", "makeCompound", "makeHalfSpace",
+      "extrude", "revolve", "loft", "sweepPipe",
+      "fillet", "chamfer", "hollow", "draftAngle", "defeature", "cylindricalHole",
+      "linearForm", "revolutionForm", "localPrism", "localRevolution",
+      "transform", "translate", "rotate", "scale", "mirror", "batchTransformCopy", "generalTransform"
+    ],
+    "algorithms": [
+      "booleanCommon", "booleanCut", "booleanFuse", "section", "split",
+      "generalFuse", "selectGeneralFuseCells", "glue", "sew",
+      "distance", "extremaCurveCurve", "extremaCurveSurface", "extremaSurfaceSurface",
+      "intersectCurveCurve", "intersectCurveSurface", "intersectSurfaceSurface",
+      "projectPointCurve", "projectPointSurface", "projectHLR",
+      "classifyPoint", "sectionAnalysis", "massProps", "middlePath",
+      "offsetShape", "offsetWire2D", "fixShape", "unifySameDomain", "shapeUpgrade", "sweepPipeShell"
+    ],
+    "mesh": [
+      "tessellate", "tessellateEdges", "triangulationData", "replaceTriangulation",
+      "validateTriangulation", "repairTriangulation"
+    ],
+    "exchange-mesh": [
+      "importSTL", "exportSTL", "importPLY", "exportPLY",
+      "importOBJ", "exportOBJ", "importGLTF", "exportGLTF",
+      "importVRML", "exportVRML"
+    ],
+    "exchange-cad": [
+      "importBREP", "exportBREP", "importSTEP", "exportSTEP",
+      "importSTEPDocument", "exportSTEPDocument", "importIGES", "exportIGES",
+      "importIGESDocument", "exportIGESDocument", "importXCAF", "exportXCAF",
+      "probeFormat"
+    ]
+  },
+  "artifactModuleCandidates": {
+    "geometry-topology.side.wasm": ["geometry-topology"],
+    "modeling.side.wasm": ["modeling"],
+    "algorithms.side.wasm": ["algorithms"],
+    "mesh.side.wasm": ["mesh"],
+    "exchange-mesh.side.wasm": ["exchange-mesh"],
+    "exchange-cad.side.wasm": ["exchange-cad"]
+  },
+  "profiles": {
+    "core-modeling": {
+      "artifact": "core-modeling.wasm",
+      "artifacts": ["geometry-topology.side.wasm", "modeling.side.wasm", "algorithms.side.wasm"]
+    },
+    "mesh": {
+      "artifact": "mesh.wasm",
+      "artifacts": ["geometry-topology.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm"]
+    },
+    "exchange": {
+      "artifact": "exchange.wasm",
+      "artifacts": ["exchange-cad.side.wasm", "exchange-mesh.side.wasm"]
+    },
+    "step-preview": {
+      "artifact": "step-preview.wasm",
+      "artifacts": ["exchange-cad.side.wasm"]
+    },
+    "modeling-viewer": {
+      "artifact": "modeling-viewer.wasm",
+      "artifacts": ["geometry-topology.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm"]
+    },
+    "full-profile": {
+      "artifact": "full.wasm",
+      "artifacts": ["geometry-topology.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm", "exchange-mesh.side.wasm", "exchange-cad.side.wasm"]
+    }
+  }
+}

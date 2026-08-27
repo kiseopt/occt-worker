@@ -1,5 +1,5 @@
 {
-  "protocolVersion": "1.0.0",
+  "protocolVersion": "1.2.0",
   "errors": [
     "ConstructionFailed",
     "BooleanFailed",

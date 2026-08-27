@@ -1,5 +1,7 @@
 import { BaseClient } from "./client.js";
-import type { BinaryBuffer, KernelErrorData, MaterializedBuffer, RequestOptions } from "./types.js";
+import { InProcessTransport } from "./in-process-transport.js";
+import type { OperationName } from "./generated.js";
+import type { RequestOptions } from "./types.js";
 
 export interface DirectClientRuntimeHooks {
   isCancelled(): boolean;
@@ -15,8 +17,7 @@ export interface DirectBuffer {
 }
 
 interface RuntimeState {
-  operation: string | undefined;
-  options: RequestOptions | undefined;
+  transport?: InProcessTransport;
   hooks?: DirectClientRuntimeHooks;
 }
 
@@ -35,24 +36,16 @@ interface WasmExports extends WebAssembly.Exports {
   k_buffer_len: (bufferId: number) => number;
 }
 
-interface ResponseFrame {
-  id: number;
-  ok: boolean;
-  result?: unknown;
-  error?: KernelErrorData;
-}
-
 export class DirectClient extends BaseClient {
   readonly #exports: WasmExports;
-  readonly #runtimeState: RuntimeState;
+  readonly #transport: InProcessTransport;
   readonly #directBuffers = new WeakMap<DirectBuffer, { bufferId: number; released: boolean }>();
   readonly #liveDirectBuffers = new Set<{ bufferId: number; released: boolean }>();
-  #nextId = 1;
 
-  private constructor(exports: WasmExports, runtimeState: RuntimeState) {
+  private constructor(exports: WasmExports, transport: InProcessTransport) {
     super();
     this.#exports = exports;
-    this.#runtimeState = runtimeState;
+    this.#transport = transport;
   }
 
   static async create(
@@ -64,7 +57,7 @@ export class DirectClient extends BaseClient {
     // Advance a deterministic synthetic clock instead of reading the host clock.
     let memory: WebAssembly.Memory | undefined;
     let clockNanoseconds = 1767225600000000000n;
-    const runtimeState: RuntimeState = { operation: undefined, options: undefined };
+    const runtimeState: RuntimeState = {};
     if (hooks !== undefined) runtimeState.hooks = hooks;
     const stubs: Record<string, (...args: never[]) => number | void> = {
       clock_time_get: (_clockId: number, _precision: bigint, timePointer: number): number => {
@@ -102,14 +95,11 @@ export class DirectClient extends BaseClient {
         return 0;
       },
       occt_worker_cancelled: (): number => {
-        return runtimeState.options?.signal?.aborted || runtimeState.hooks?.isCancelled() ? 1 : 0;
+        return runtimeState.transport?.isCancelled() || runtimeState.hooks?.isCancelled() ? 1 : 0;
       },
       occt_worker_progress: (fraction: number): void => {
-        const operation = runtimeState.operation;
-        if (operation !== undefined) {
-          runtimeState.options?.onProgress?.({ operation, fraction });
-          runtimeState.hooks?.onProgress(fraction);
-        }
+        runtimeState.transport?.reportProgress(fraction);
+        runtimeState.hooks?.onProgress(fraction);
       },
     };
     const wasi = new Proxy(stubs, {
@@ -145,13 +135,24 @@ export class DirectClient extends BaseClient {
       exports.__set_stack_limits(exports.emscripten_stack_get_base(), exports.emscripten_stack_get_end());
     }
     exports._initialize?.();
-    const client = new DirectClient(exports, runtimeState);
+    let client: DirectClient;
+    const transport = new InProcessTransport({
+      bytes: () => new Uint8Array(exports.memory.buffer),
+      alloc: (length) => exports.k_alloc(length),
+      free: (pointer) => exports.k_free(pointer),
+      handle: (pointer, length) => exports.k_handle(pointer, length),
+      responsePointer: () => exports.k_response_ptr(),
+      bufferPointer: (bufferId) => exports.k_buffer_ptr(bufferId),
+      bufferLength: (bufferId) => exports.k_buffer_len(bufferId),
+    }, (error) => client.kernelError(error));
+    client = new DirectClient(exports, transport);
+    runtimeState.transport = transport;
     await client.initialize();
     return client;
   }
 
   async createBuffer(byteLength: number): Promise<DirectBuffer> {
-    const descriptor = this.#call("createBuffer", { byteLength }) as {
+    const descriptor = this.#transport.call("createBuffer", { byteLength }) as {
       bufferId: number;
       byteLength: number;
       layout: string;
@@ -180,7 +181,7 @@ export class DirectClient extends BaseClient {
     const state = this.#directBuffers.get(buffer);
     if (state === undefined) throw new TypeError("DirectBuffer belongs to a different DirectClient");
     if (state.released) throw new TypeError("DirectBuffer has already been released");
-    this.#call("freeBuffer", { bufferId: state.bufferId });
+    this.#transport.call("freeBuffer", { bufferId: state.bufferId });
     state.released = true;
     this.#liveDirectBuffers.delete(state);
   }
@@ -191,109 +192,11 @@ export class DirectClient extends BaseClient {
     this.#liveDirectBuffers.clear();
   }
 
-  protected async send(
-    op: string,
+  protected async send<T>(
+    op: OperationName,
     args: Record<string, unknown>,
     options: RequestOptions = {},
-  ): Promise<unknown> {
-    if (options.signal?.aborted) {
-      throw options.signal.reason ?? new DOMException("Kernel request aborted", "AbortError");
-    }
-    if (options.outputBuffers === "shared" && typeof SharedArrayBuffer === "undefined") {
-      throw new TypeError("SharedArrayBuffer is not available in this host");
-    }
-    const inputBuffers: number[] = [];
-    const prepareInputs = (value: unknown): unknown => {
-      if (value !== null && typeof value === "object" && "$inputBuffer" in value) {
-        const input = value as {
-          $inputBuffer: BinaryBuffer;
-          byteOffset?: number;
-          byteLength?: number;
-        };
-        const byteOffset = input.byteOffset ?? 0;
-        const byteLength = input.byteLength ?? input.$inputBuffer.byteLength;
-        const source = new Uint8Array(input.$inputBuffer, byteOffset, byteLength);
-        const descriptor = this.#call("createBuffer", { byteLength }) as {
-          bufferId: number;
-        };
-        const pointer = this.#exports.k_buffer_ptr(descriptor.bufferId);
-        new Uint8Array(this.#exports.memory.buffer, pointer, byteLength).set(source);
-        inputBuffers.push(descriptor.bufferId);
-        return { bufferId: descriptor.bufferId };
-      }
-      if (Array.isArray(value)) return value.map(prepareInputs);
-      if (value !== null && typeof value === "object") {
-        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, prepareInputs(item)]));
-      }
-      return value;
-    };
-
-    this.#runtimeState.operation = op;
-    this.#runtimeState.options = options;
-    try {
-      options.onProgress?.({ operation: op, fraction: 0 });
-      const result = this.#materialize(
-        this.#call(op, prepareInputs(args) as Record<string, unknown>),
-        options.outputBuffers === "shared",
-      );
-      options.onProgress?.({ operation: op, fraction: 1 });
-      return result;
-    } catch (error) {
-      if (options.signal?.aborted) {
-        throw options.signal.reason ?? new DOMException("Kernel request aborted", "AbortError");
-      }
-      throw error;
-    } finally {
-      for (const bufferId of inputBuffers) this.#call("freeBuffer", { bufferId });
-      this.#runtimeState.operation = undefined;
-      this.#runtimeState.options = undefined;
-    }
-  }
-
-  #call(op: string, args: Record<string, unknown>): unknown {
-    const request = new TextEncoder().encode(JSON.stringify({ id: this.#nextId++, op, args }));
-    const pointer = this.#exports.k_alloc(request.byteLength);
-    if (pointer === 0 && request.byteLength !== 0) throw new Error("Kernel request allocation failed");
-    let responseLength: number;
-    try {
-      new Uint8Array(this.#exports.memory.buffer, pointer, request.byteLength).set(request);
-      responseLength = this.#exports.k_handle(pointer, request.byteLength);
-    } finally {
-      this.#exports.k_free(pointer);
-    }
-    if (responseLength === 0) throw new Error("Kernel instance could not construct a protocol response");
-    const responsePointer = this.#exports.k_response_ptr();
-    const response = JSON.parse(
-      new TextDecoder().decode(
-        new Uint8Array(this.#exports.memory.buffer, responsePointer, responseLength),
-      ),
-    ) as ResponseFrame;
-    if (!response.ok) this.kernelError(response.error!);
-    return response.result;
-  }
-
-  #materialize(value: unknown, shared: boolean): unknown {
-    if (
-      value !== null
-      && typeof value === "object"
-      && "bufferId" in value
-      && "byteLength" in value
-      && "layout" in value
-    ) {
-      const descriptor = value as { bufferId: number; byteLength: number; layout: string };
-      const pointer = this.#exports.k_buffer_ptr(descriptor.bufferId);
-      const length = this.#exports.k_buffer_len(descriptor.bufferId);
-      const buffer: BinaryBuffer = shared ? new SharedArrayBuffer(length) : new ArrayBuffer(length);
-      new Uint8Array(buffer).set(new Uint8Array(this.#exports.memory.buffer, pointer, length));
-      this.#call("freeBuffer", { bufferId: descriptor.bufferId });
-      return { layout: descriptor.layout, data: buffer } satisfies MaterializedBuffer<BinaryBuffer>;
-    }
-    if (Array.isArray(value)) return value.map((item) => this.#materialize(item, shared));
-    if (value !== null && typeof value === "object") {
-      return Object.fromEntries(
-        Object.entries(value).map(([key, item]) => [key, this.#materialize(item, shared)]),
-      );
-    }
-    return value;
+  ): Promise<T> {
+    return this.#transport.request<T>(op, args, options);
   }
 }

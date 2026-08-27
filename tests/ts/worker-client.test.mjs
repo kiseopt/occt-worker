@@ -3,7 +3,7 @@ import test from "node:test";
 import { WorkerClient } from "../../dist/worker-client.js";
 
 const capabilities = {
-  protocolVersion: "1.0.0",
+  protocolVersion: "1.2.0",
   kernelVersion: "test",
   occtVersion: "test",
   ops: [],
@@ -93,6 +93,19 @@ test("WorkerClient starts timeout only when a queued call is dispatched", async 
   }
 });
 
+test("WorkerClient rejects requests after close instead of leaving them queued", async () => {
+  const factory = () => new FakeWorker((worker, message) => {
+    if (handleCapabilities(worker, message)) return;
+    queueMicrotask(() => respond(worker, message, message.op));
+  });
+  const client = await WorkerClient.create(factory, new ArrayBuffer(1));
+  client.close();
+  await assert.rejects(
+    client.request("stats", {}),
+    /WorkerClient closed/,
+  );
+});
+
 test("WorkerClient shares caller input and requests shared output buffers", async () => {
   const input = new SharedArrayBuffer(16);
   const output = new SharedArrayBuffer(32);
@@ -111,6 +124,39 @@ test("WorkerClient shares caller input and requests shared output buffers", asyn
     const result = await client.requestShared("shared", { data: { $inputBuffer: input } });
     assert.strictEqual(result.data.data, output);
     assert.equal(input.byteLength, 16);
+  } finally {
+    client.close();
+  }
+});
+
+test("WorkerClient deduplicates repeated ArrayBuffer transfer entries", async () => {
+  const input = new ArrayBuffer(16);
+  const factory = () => new FakeWorker((worker, message, transfers) => {
+    if (handleCapabilities(worker, message)) return;
+    assert.deepEqual(transfers, [input]);
+    queueMicrotask(() => respond(worker, message, message.op));
+  });
+
+  const client = await WorkerClient.create(factory, new ArrayBuffer(1));
+  try {
+    await client.request("shared", { first: input, nested: { second: input } });
+  } finally {
+    client.close();
+  }
+});
+
+test("WorkerClient transfers the backing buffer of typed-array inputs once", async () => {
+  const input = new ArrayBuffer(16);
+  const view = new Uint8Array(input, 4, 8);
+  const factory = () => new FakeWorker((worker, message, transfers) => {
+    if (handleCapabilities(worker, message)) return;
+    assert.deepEqual(transfers, [input]);
+    queueMicrotask(() => respond(worker, message, message.op));
+  });
+
+  const client = await WorkerClient.create(factory, new ArrayBuffer(1));
+  try {
+    await client.request("shared", { first: view, repeated: view });
   } finally {
     client.close();
   }
@@ -433,6 +479,34 @@ test("WorkerClient rejects persistent initialization failure without restarting"
   assert.equal(factoryCalls, 1);
 });
 
+test("WorkerClient terminates a ready worker when capability validation fails", async () => {
+  let worker;
+  const factory = () => {
+    worker = new FakeWorker((instance, message) => {
+      if (message.op === "capabilities") {
+        queueMicrotask(() => respond(instance, message, {
+          ...capabilities,
+          protocolVersion: "incompatible",
+        }));
+      }
+    });
+    return worker;
+  };
+
+  await assert.rejects(
+    WorkerClient.create(factory, new ArrayBuffer(1)),
+    /Unsupported kernel protocol incompatible/,
+  );
+  assert.equal(worker.terminated, true);
+});
+
+test("WorkerClient preserves an initial worker factory error", async () => {
+  await assert.rejects(
+    WorkerClient.create(() => { throw new Error("worker factory unavailable"); }, new ArrayBuffer(1)),
+    /worker factory unavailable/,
+  );
+});
+
 test("WorkerClient fails the old queue and rebuilds once after a runtime error", async () => {
   let factoryCalls = 0;
   const factory = () => {
@@ -472,6 +546,27 @@ test("WorkerClient fails the old queue and rebuilds once after a runtime error",
   await assert.rejects(scope.end(), /expired kernel instance/);
   const replacementScope = await client.beginScope();
   await replacementScope.end();
+  assert.equal(factoryCalls, 2);
+  client.close();
+});
+
+test("WorkerClient rejects after a replacement worker factory fails", async () => {
+  let factoryCalls = 0;
+  const factory = () => {
+    factoryCalls++;
+    if (factoryCalls > 1) throw new Error("replacement worker unavailable");
+    return new FakeWorker((worker, message) => {
+      if (handleCapabilities(worker, message)) return;
+      queueMicrotask(() => worker.emitMessage({
+        type: "fatal",
+        error: { code: "KernelError", message: "runtime trap" },
+      }));
+    });
+  };
+
+  const client = await WorkerClient.create(factory, new ArrayBuffer(1));
+  await assert.rejects(client.request("crash", {}), /runtime trap/);
+  await assert.rejects(client.request("after", {}), /replacement worker unavailable/);
   assert.equal(factoryCalls, 2);
   client.close();
 });

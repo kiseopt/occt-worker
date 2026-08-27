@@ -1,19 +1,19 @@
 {
-    "artifact":  "wasm/occt-worker.wasmtime.wasm",
-    "transform":  "Binaryen --translate-to-exnref",
-    "sizeBytes":  30126094,
-    "sha256":  "835f3bdfb96c0880cf01b322cfc4c294e423955607d54f9b43549ba0eccb489a",
-    "testedWith":  "wasmtime 47.0.3 (5554cc1a6 2026-07-31)",
-    "smoke":  [
-                  "initialize",
-                  "beginScope",
-                  "makeBox",
-                  "makeCylinder",
-                  "booleanCut",
-                  "bbox",
-                  "tessellate",
-                  "InvalidArgs",
-                  "releaseAll",
-                  "stats"
-              ]
+  "artifact": "wasm/occt-worker.wasmtime.wasm",
+  "transform": "Binaryen --translate-to-exnref",
+  "sizeBytes": 30401124,
+  "sha256": "7546df56dbca08376708f46d08f2da272615b197f186d5898a8def9222376f3c",
+  "testedWith": "wasmtime 47.0.3 (5554cc1a6 2026-07-31)",
+  "smoke": [
+    "initialize",
+    "beginScope",
+    "makeBox",
+    "makeCylinder",
+    "booleanCut",
+    "bbox",
+    "tessellate",
+    "InvalidArgs",
+    "releaseAll",
+    "stats"
+  ]
 }

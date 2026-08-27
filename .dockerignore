@@ -1,0 +1,13 @@
+.git
+**/.git
+.tools
+artifacts
+build
+coverage
+dist
+node_modules
+occt
+tmp-docs
+vendor/emsdk
+wasm
+*.log

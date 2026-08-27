@@ -31,7 +31,14 @@ try {
   await writeFile(join(temporary, "smoke.mjs"), `
     import assert from "node:assert/strict";
     import { readFile } from "node:fs/promises";
-    import { DirectClient } from "occt-worker";
+    import { DirectClient, resolveArtifact } from "occt-worker";
+    const artifactManifest = JSON.parse(await readFile(new URL("./node_modules/occt-worker/protocol/artifacts.json", import.meta.url), "utf8"));
+    const meshDescriptor = { name: "mesh.wasm", ...artifactManifest.artifacts["mesh.wasm"] };
+    assert.equal(await resolveArtifact(meshDescriptor), meshDescriptor.url);
+    assert.equal(
+      await resolveArtifact(meshDescriptor, { baseUrl: "https://mirror.example/occt/" }),
+      "https://mirror.example/occt/mesh.wasm",
+    );
     const wasmUrl = import.meta.resolve("occt-worker/wasm");
     assert.ok(import.meta.resolve("occt-worker/worker").endsWith("/dist/worker-entry.js"));
     const client = await DirectClient.create(await readFile(new URL(wasmUrl)));
@@ -96,10 +103,11 @@ try {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
   const installedPackage = JSON.parse(await readFile(join(temporary, "node_modules/occt-worker/package.json"), "utf8"));
-  assert.equal(installedPackage.version, "1.0.0");
+  assert.equal(installedPackage.version, "1.2.0");
   assert.ok(pack.files.some(({ path }) => path === "SOURCE.md"));
   assert.ok(pack.files.some(({ path }) => path === "npm-shrinkwrap.json"));
   assert.ok(pack.files.some(({ path }) => path === "THIRD-PARTY-NOTICES.txt"));
+  assert.ok(!pack.files.some(({ path }) => path.startsWith("artifacts/")));
   assert.ok(!pack.files.some(({ path }) => path.endsWith("debug.wasm")));
   console.log(JSON.stringify({ files: pack.files.length, packageSize: pack.size }));
 } finally {

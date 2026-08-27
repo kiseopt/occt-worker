@@ -1,8 +1,8 @@
 {
   "artifact": "wasm/occt-worker.wasm",
   "standaloneReactor": true,
-  "sizeBytes": 27430982,
-  "sha256": "183a444091f183202fe312cc41ed33c15d6cf37785a4f61ce51358bab0704035",
+  "sizeBytes": 27669688,
+  "sha256": "e4a9693731bbdc96a1d83e068c451f400f8f847d1a107455a6fcaf5fb83de141",
   "imports": [
     {
       "module": "env",
@@ -91,6 +91,10 @@
       "kind": "memory"
     },
     {
+      "name": "__indirect_function_table",
+      "kind": "table"
+    },
+    {
       "name": "k_alloc",
       "kind": "function"
     },
@@ -101,10 +105,6 @@
     {
       "name": "k_handle",
       "kind": "function"
-    },
-    {
-      "name": "__indirect_function_table",
-      "kind": "table"
     },
     {
       "name": "k_response_ptr",

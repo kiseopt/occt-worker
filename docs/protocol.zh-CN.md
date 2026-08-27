@@ -1,4 +1,4 @@
-# Protocol v1.0.0 / 协议 v1.0.0
+# Protocol v1.2.0 / 协议 v1.2.0
 
 英文规范：[protocol.md](protocol.md)。`protocol/` 是机器可读单一事实源，生成文件由 `npm run generate` 更新。
 
@@ -26,7 +26,7 @@ wasm ABI 为同步串行调用：宿主用 `k_alloc` 分配请求内存，写入
 
 ## 能力、版本和错误码
 
-`capabilities` 返回 `protocolVersion`、`kernelVersion`、`occtVersion`、`ops`、`historySupport` 和 `buildFlags`。当前协议版本为 `1.0.0`，发布产物实测公开 161 个操作。历史能力逐操作为 `full`、`partial` 或 `unsupported`；请求不支持的历史会得到 `InvalidArgs`。
+`capabilities` 返回 `protocolVersion`、`kernelVersion`、`occtVersion`、`ops`、`historySupport` 和 `buildFlags`。当前协议版本为 `1.2.0`，发布产物实测公开 161 个操作。历史能力逐操作为 `full`、`partial` 或 `unsupported`；请求不支持的历史会得到 `InvalidArgs`。
 
 稳定错误码包括：`ConstructionFailed`、`BooleanFailed`、`FilletFailed`、`TessellationFailed`、`ImportExportFailed`、`HealingFailed`、`Cancelled`、`InvalidHandle`、`InvalidArgs`、`OutOfMemory`、`KernelError` 和 `ProtocolError`。
 

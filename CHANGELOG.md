@@ -1,16 +1,17 @@
 # Changelog
 
-## 1.0.1 - 2026-08-24
+## 1.2.0 - 2026-08-27
 
-### Fixed
+### Added
 
-- Replaced unavailable `Get-FileHash` calls with .NET SHA-256 hashing in Windows bootstrap and release workflows.
-- Updated the official GitHub Actions to Node.js 24-based releases.
+- Modular shared Main/Side WebAssembly artifacts and isolated runtime profiles.
+- A typed geometry engine, artifact resolution, and runtime compatibility checks.
+- Expanded modeling, topology, mesh processing, and CAD/mesh exchange operations.
 
 ### Changed
 
-- Rebuilt the release wasm and refreshed its recorded size and SHA-256 evidence.
-- Documented the non-fatal OCCT 8.0.1 deprecation warnings emitted during compilation.
+- The public protocol and release artifact manifests are updated to version 1.2.0.
+- Kernel sources and TypeScript types are split by operation domain for clearer ownership.
 
 ## 1.0.0 - 2026-08-24
 

@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
 
 import { DirectClient } from "./direct-client.js";
+import { OPERATIONS, type OperationName } from "./generated.js";
+import { collectArrayBuffers } from "./protocol-codec.js";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -49,16 +51,13 @@ self.addEventListener("message", async (event) => {
         ? {}
         : { cancelFlag: new Int32Array(message.cancelBuffer) }),
     };
-    const result = await client.request(message.op!, message.args!, {
+    if (!(OPERATIONS as readonly string[]).includes(message.op!)) {
+      throw new TypeError(`Unknown kernel operation '${message.op!}'`);
+    }
+    const result = await client.request(message.op! as OperationName, message.args!, {
       ...(message.outputBuffers === undefined ? {} : { outputBuffers: message.outputBuffers }),
     });
-    const transfers: Transferable[] = [];
-    const collect = (value: unknown): void => {
-      if (value instanceof ArrayBuffer) transfers.push(value);
-      else if (Array.isArray(value)) value.forEach(collect);
-      else if (value !== null && typeof value === "object") Object.values(value).forEach(collect);
-    };
-    collect(result);
+    const transfers: Transferable[] = collectArrayBuffers(result);
     self.postMessage({ type: "response", id: message.id, ok: true, result }, transfers);
   } catch (error) {
     if (error instanceof WebAssembly.RuntimeError) {

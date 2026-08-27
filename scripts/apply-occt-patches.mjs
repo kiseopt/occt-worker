@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const occt = fileURLToPath(new URL("../occt", import.meta.url));
-const patch = fileURLToPath(new URL("../patches/occt-8.0.1-wasm.patch", import.meta.url));
+const identity = JSON.parse(await readFile(new URL("../protocol/artifacts.json", import.meta.url), "utf8"));
+const patch = fileURLToPath(new URL(`../${identity.sources.occt.patch}`, import.meta.url));
 
 const git = (args) => spawnSync("git", args, { cwd: occt, encoding: "utf8" });
 if (git(["apply", "--reverse", "--check", patch]).status === 0) {

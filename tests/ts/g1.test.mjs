@@ -11,7 +11,7 @@ const wasm = await readFile(new URL("../../wasm/occt-worker.wasm", import.meta.u
 test("G1 plate-with-hole workflow and scoped resources", async () => {
   const client = await DirectClient.create(wasm);
   const capabilities = await client.initialize();
-  assert.equal(capabilities.protocolVersion, "1.0.0");
+  assert.equal(capabilities.protocolVersion, "1.2.0");
 
   const scope = await client.beginScope();
   const plate = await scope.makeBox([10, 10, 4]);

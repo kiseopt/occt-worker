@@ -28,8 +28,13 @@ jobs:
       - run: npm run test:wasmtime
       - run: git diff --exit-code -- wasm/occt-worker.wasmtime.wasm docs/wasmtime-build.json
       - run: npm run build:wasm:debug
+      - run: npm run build:wasm:profiles
+      - run: npm run build:wasm:shared
+      - run: npm run test:artifacts
+      - run: node scripts/verify-symbol-closure.mjs --main artifacts/shared-main.wasm --side artifacts/geometry-topology.side.wasm --side artifacts/modeling.side.wasm --side artifacts/algorithms.side.wasm --side artifacts/mesh.side.wasm --side artifacts/exchange-mesh.side.wasm --side artifacts/exchange-cad.side.wasm
+      - run: git diff --exit-code -- protocol/artifacts.json
       - run: npm test
-      - run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/generated.ts kernel/include/generated.hpp
+      - run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts ts/src/runtime-manifest.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
       - run: npm run test:debug
       - run: npx playwright install chromium firefox webkit
       - run: npm run test:browser:all
@@ -42,5 +47,6 @@ jobs:
             wasm/occt-worker.wasm
             wasm/occt-worker.wasmtime.wasm
             build/debug/occt-worker.debug.wasm
+            artifacts/
             docs/g0-build.json
             docs/wasmtime-build.json

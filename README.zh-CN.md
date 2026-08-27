@@ -12,7 +12,7 @@ TypeScript 客户端。
 
 [English README](README.md) · [文档导航](docs/README.md) · [API 参考](docs/api.zh-CN.md) · [能力矩阵](docs/capabilities.zh-CN.md)
 
-**当前版本：** `v1.0.0` · **运行时：** Node.js `>=20` · **许可证：** 项目代码采用
+**当前版本：** `v1.2.0` · **运行时：** Node.js `>=20` · **许可证：** 项目代码采用
 Apache-2.0；OCCT 和其他第三方组件请以分发通知为准。
 
 本项目独立开发，与 Open Cascade SAS 无关联、未获其背书或赞助，也不使用 Open
@@ -41,6 +41,11 @@ Cascade SAS 商标。
 ```sh
 npm install occt-worker
 ```
+
+> **安装体积与首次下载体积不同。** npm 包包含完整 full WASM、运行时、类型和协议
+> manifest；安装时不会按功能懒加载。浏览器首次使用时，shared Side/Profile 产物可通过
+> `resolveArtifact({ name })` 从 Release/CDN 懒加载，也可以用 `baseUrl` 或自定义 resolver
+> 指向私有镜像。
 
 ## 快速开始
 
@@ -78,6 +83,15 @@ await scope.end();
 | 底层消息、缓冲区、错误和默认值 | `request()` 与协议帧 | [协议规范](docs/protocol.zh-CN.md) |
 | Wasmtime 或自定义宿主集成 | 同步 WebAssembly ABI | [宿主支持](docs/hosts.zh-CN.md) |
 | 参数化特征和草图 | `ParametricModel` 与特征定义 | [TypeScript API](docs/api.zh-CN.md) |
+| shared Main/Side 高层兼容 | `SharedClient` + `EngineCompatClient` | [TypeScript API](docs/api.zh-CN.md) |
+
+使用 isolated Profile 时，从 `protocol/artifacts.json` 读取 descriptor，并向
+`createWorkerProfileRuntime` 提供 Worker 工厂；该 helper 会在启动 Worker 前校验产物，随后
+把返回的 factory 注册到 `GeometryEngine`，以便按首次使用懒启动 Profile。shared Side/Profile
+二进制不在 npm tarball 中，而是在版本 tag 的 GitHub Release 中由 release workflow 自动构建并上传；
+`protocol/artifacts.json` 同步记录对应版本 URL 和 SHA-256。使用 `SharedClient` 时传入 Main/Side
+构件即可通过旧的 `BaseClient`/`EngineCompatClient` 调用面运行；私有部署仍可配置 `baseUrl`、
+`defaultBase` 或 `resolve`，不需要项目手工维护 CDN。
 
 ## 支持矩阵
 

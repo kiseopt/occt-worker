@@ -13,10 +13,10 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -30,6 +30,14 @@ jobs:
             throw "Tag ${{ github.ref_name }} does not match package version $packageVersion"
           }
       - run: npm run build:wasm
+      - run: npm run build:wasm:profiles
+      - run: npm run build:wasm:shared
+      - name: Verify modular artifacts and set release URLs
+        shell: pwsh
+        run: |
+          $releaseBase = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/"
+          node scripts/verify-artifacts.mjs --write --release-base-url $releaseBase
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install Wasmtime
         shell: pwsh
         run: |
@@ -47,19 +55,9 @@ jobs:
       - name: Verify generated release files
         shell: pwsh
         run: |
-          git diff --exit-code -- wasm/occt-worker.wasm wasm/occt-worker.wasmtime.wasm docs/g0-build.json docs/wasmtime-build.json protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/generated.ts kernel/include/generated.hpp
-          $mainStream = [IO.File]::OpenRead('wasm/occt-worker.wasm')
-          $wasmtimeStream = [IO.File]::OpenRead('wasm/occt-worker.wasmtime.wasm')
-          try {
-            $sha256 = [Security.Cryptography.SHA256]::Create()
-            $mainHash = ([BitConverter]::ToString($sha256.ComputeHash($mainStream))).Replace('-', '').ToLowerInvariant()
-            $sha256.Initialize()
-            $wasmtimeHash = ([BitConverter]::ToString($sha256.ComputeHash($wasmtimeStream))).Replace('-', '').ToLowerInvariant()
-          } finally {
-            if ($sha256) { $sha256.Dispose() }
-            $mainStream.Dispose()
-            $wasmtimeStream.Dispose()
-          }
+          git diff --exit-code -- wasm/occt-worker.wasm wasm/occt-worker.wasmtime.wasm docs/g0-build.json docs/wasmtime-build.json protocol/artifacts.json protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts ts/src/runtime-manifest.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
+          $mainHash = (Get-FileHash wasm/occt-worker.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
+          $wasmtimeHash = (Get-FileHash wasm/occt-worker.wasmtime.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
           "$mainHash  occt-worker.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasm.sha256
           "$wasmtimeHash  occt-worker.wasmtime.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasmtime.wasm.sha256
       - name: Create corresponding source archive
@@ -78,11 +76,8 @@ jobs:
           & tar -xf $projectArchive -C $stageRoot
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          $sources = @(
-            @{ Path = 'occt'; Commit = 'b8f597c677811d1f9f4d8a97f5ae2825c0353a42' },
-            @{ Path = 'vendor/emsdk'; Commit = 'c0bb220cb6e6f4e0fabb6f6db9efd53390ef5e56' },
-            @{ Path = 'vendor/json'; Commit = '55f93686c01528224f448c19128836e7df245f72' }
-          )
+          $identity = Get-Content -Raw (Join-Path $stageRoot 'protocol/artifacts.json') | ConvertFrom-Json
+          $sources = @($identity.sources.PSObject.Properties | ForEach-Object { $_.Value })
           foreach ($source in $sources) {
             $actualCommit = (& git -C $source.Path rev-parse HEAD).Trim()
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -97,12 +92,15 @@ jobs:
             & tar -xf $sourceArchive -C $destination
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+          $occtSource = $sources | Where-Object { $_.Path -eq 'occt' }
+          $emsdkSource = $sources | Where-Object { $_.Path -eq 'vendor/emsdk' }
+          $jsonSource = $sources | Where-Object { $_.Path -eq 'vendor/json' }
 
           Push-Location $stageRoot
           try {
-            & git apply --directory=occt --check patches/occt-8.0.1-wasm.patch
+            & git apply --directory=occt --check $occtSource.Patch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            & git apply --directory=occt patches/occt-8.0.1-wasm.patch
+            & git apply --directory=occt $occtSource.Patch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           } finally {
             Pop-Location
@@ -113,29 +111,39 @@ jobs:
           @"
           occt-worker release: $tag
           occt-worker commit: $projectCommit
-          OCCT 8.0.1 commit: b8f597c677811d1f9f4d8a97f5ae2825c0353a42 (patch applied; patch retained at patches/occt-8.0.1-wasm.patch)
-          Emscripten SDK 4.0.23 commit: c0bb220cb6e6f4e0fabb6f6db9efd53390ef5e56
-          nlohmann/json 3.12.0 commit: 55f93686c01528224f448c19128836e7df245f72
+          OCCT $($occtSource.Version) commit: $($occtSource.Commit) (patch applied; patch retained at $($occtSource.Patch))
+          Emscripten SDK $($emsdkSource.Version) commit: $($emsdkSource.Commit)
+          nlohmann/json $($jsonSource.Version) commit: $($jsonSource.Commit)
           npm dependencies: locked by npm-shrinkwrap.json
           "@ | Set-Content -Encoding ascii (Join-Path $stageRoot 'SOURCE-IDENTITIES.txt')
 
           $sourceAsset = Join-Path $releaseAssets "$archiveBase.tar.gz"
           & tar -czf $sourceAsset -C $env:RUNNER_TEMP $archiveBase
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $sourceStream = [IO.File]::OpenRead($sourceAsset)
-          try {
-            $sha256 = [Security.Cryptography.SHA256]::Create()
-            $sourceHash = ([BitConverter]::ToString($sha256.ComputeHash($sourceStream))).Replace('-', '').ToLowerInvariant()
-          } finally {
-            if ($sha256) { $sha256.Dispose() }
-            $sourceStream.Dispose()
-          }
+          $sourceHash = (Get-FileHash $sourceAsset -Algorithm SHA256).Hash.ToLowerInvariant()
           "$sourceHash  $archiveBase.tar.gz" | Set-Content -Encoding ascii "$sourceAsset.sha256"
-      - run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish GitHub release assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" wasm/occt-worker.wasm wasm/occt-worker.wasm.sha256 wasm/occt-worker.wasmtime.wasm wasm/occt-worker.wasmtime.wasm.sha256 docs/g0-build.json docs/wasmtime-build.json "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz" "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz.sha256" --generate-notes
+        run: |
+          $fixedAssets = @(
+            'wasm/occt-worker.wasm',
+            'wasm/occt-worker.wasm.sha256',
+            'wasm/occt-worker.wasmtime.wasm',
+            'wasm/occt-worker.wasmtime.wasm.sha256',
+            'docs/g0-build.json',
+            'docs/wasmtime-build.json',
+            'protocol/artifacts.json'
+          )
+          $manifest = Get-Content 'protocol/artifacts.json' -Raw | ConvertFrom-Json
+          $modularAssets = @($manifest.artifacts.PSObject.Properties.Name | ForEach-Object { "artifacts/$_" })
+          $sourceAssets = @(
+            "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz",
+            "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz.sha256"
+          )
+          $assets = $fixedAssets + $modularAssets + $sourceAssets
+          gh release create "${{ github.ref_name }}" $assets --generate-notes
+      - run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,6 +1,5 @@
 (module
   (import "occt" "memory" (memory 256 32768))
-  (import "occt" "_initialize" (func $initialize))
   (import "occt" "k_alloc" (func $alloc (param i32) (result i32)))
   (import "occt" "k_free" (func $free (param i32)))
   (import "occt" "k_handle" (func $handle (param i32 i32) (result i32)))
@@ -138,7 +137,6 @@
     (call $free (local.get $expected)))
 
   (func (export "_start")
-    (call $initialize)
     (call $begin_scope)
     (call $make_box)
     (call $make_cylinder)

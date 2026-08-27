@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "../.."
+  },
+  "files": [
+    "protocol-handles.test.ts",
+    "../../ts/src/draco3dgltf.d.ts"
+  ],
+  "include": []
+}

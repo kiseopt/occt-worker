@@ -2,16 +2,53 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { ShapeHandle } from "../../dist/client.js";
+import { ScopeHandle, ShapeHandle } from "../../dist/client.js";
 import { DirectClient } from "../../dist/direct-client.js";
-import { HISTORY_SUPPORT, OPERATION_CONTRACTS, OPERATIONS, PROTOCOL_SEMANTICS } from "../../dist/generated.js";
+import { collectArrayBuffers, materializeProtocolBuffers } from "../../dist/protocol-codec.js";
+import {
+  HISTORY_SUPPORT,
+  OPERATION_CONTRACTS,
+  OPERATION_RESULT_HANDLE_PATHS,
+  OPERATIONS,
+  PROTOCOL_SEMANTICS,
+} from "../../dist/generated.js";
 
 const wasm = await readFile(new URL("../../wasm/occt-worker.wasm", import.meta.url));
+
+test("output buffer materialization releases remaining descriptors after failure", () => {
+  const released = [];
+  assert.throws(
+    () => materializeProtocolBuffers(
+      {
+        first: { bufferId: 1, byteLength: 1, layout: "u8" },
+        second: { bufferId: 2, byteLength: 1, layout: "u8" },
+      },
+      false,
+      (descriptor) => {
+        if (descriptor.bufferId === 2) throw new Error("invalid output");
+        return descriptor.bufferId;
+      },
+      (descriptor) => released.push(descriptor.bufferId),
+    ),
+    /invalid output/,
+  );
+  assert.deepEqual(released, [1, 2]);
+});
+
+test("buffer collection is atomic, view-aware, and deduplicated", () => {
+  const buffer = new ArrayBuffer(8);
+  assert.deepEqual(
+    collectArrayBuffers({ buffer, view: new Uint8Array(buffer), repeated: [buffer] }),
+    [buffer],
+  );
+  assert.deepEqual(collectArrayBuffers({ shared: new SharedArrayBuffer(8) }), []);
+});
 
 test("protocol contracts and history classifications cover the frozen catalog", async () => {
   const contractsBytes = await readFile(new URL("../../protocol/operation-contracts.json", import.meta.url));
   const operationsBytes = await readFile(new URL("../../protocol/operations.json", import.meta.url));
   const errorsBytes = await readFile(new URL("../../protocol/errors.json", import.meta.url));
+  const errors = JSON.parse(errorsBytes);
   const contracts = JSON.parse(contractsBytes);
   const schema = JSON.parse(await readFile(new URL("../../protocol/protocol.schema.json", import.meta.url)));
   const snapshot = JSON.parse(await readFile(new URL("../../protocol/compatibility.snapshot.json", import.meta.url)));
@@ -38,6 +75,18 @@ test("protocol contracts and history classifications cover the frozen catalog", 
   };
   assertSchemaNodesAreObjects(schema);
   assert.equal(schema.$defs.request.oneOf.length, OPERATIONS.length);
+  assert.deepEqual(schema.$defs.error.properties.code.enum, errors.errors);
+  assert.equal(schema.$defs.beginScopeResult.properties.scopeId.$ref, "#/$defs/scopeHandle");
+  assert.equal(schema.$defs.freeBufferArgs.properties.bufferId.$ref, "#/$defs/bufferHandle");
+  assert.equal(schema.$defs.bboxArgs.properties.shape.$ref, "#/$defs/shapeHandle");
+  for (const contract of Object.values(OPERATION_CONTRACTS)) {
+    if (contract.args.properties?.scopeId !== undefined) {
+      assert.equal(contract.args.properties.scopeId, "scopeHandle");
+    }
+  }
+  assert.deepEqual(OPERATION_RESULT_HANDLE_PATHS.beginScope, []);
+  assert.deepEqual(OPERATION_RESULT_HANDLE_PATHS.createBuffer, []);
+  assert.deepEqual(OPERATION_RESULT_HANDLE_PATHS.makeBox, [["shape"]]);
   assert.equal(schema.$defs.makeEdgeBSplineArgs.properties.mode.enum.join(","), "interpolate,controlPoints");
   assert.equal(schema.$defs.exportXCAFArgs.required.includes("format"), false);
   assert.equal(schema.$defs.importXCAFArgs.required.includes("format"), false);
@@ -66,7 +115,7 @@ test("protocol contracts and history classifications cover the frozen catalog", 
     .update(operationsBytes)
     .update(contractsBytes)
     .digest("hex");
-  assert.equal(snapshot.protocolVersion, "1.0.0");
+  assert.equal(snapshot.protocolVersion, "1.2.0");
   assert.equal(digest, snapshot.sha256);
 });
 
@@ -157,6 +206,7 @@ test("DirectClient explicit buffers survive memory growth and support reusable p
 test("typed batch results preserve shape provenance and raw handles cannot be forged", async () => {
   const client = await DirectClient.create(wasm);
   assert.equal(client.shape, undefined);
+  assert.throws(() => new ScopeHandle(client, 1), TypeError);
   assert.throws(() => new ShapeHandle(client, client.epoch, 1), TypeError);
   assert.throws(() => client.shapeFromKernel(1), TypeError);
   const scope = await client.beginScope();

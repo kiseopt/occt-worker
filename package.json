@@ -1,6 +1,6 @@
 {
   "name": "occt-worker",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "description": "OCCT geometry kernel for WebAssembly - narrow message protocol, reproducible workflows, browser and Node first",
   "author": "occt-worker contributors",
   "repository": {
@@ -77,6 +77,9 @@
     "build:wasm": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-wasm.ps1",
     "build:wasm:debug": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-wasm.ps1 -Configuration Debug",
     "build:wasm:wasmtime": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-wasmtime-wasm.ps1",
+    "build:wasm:profiles": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-profiles.ps1",
+    "build:wasm:shared": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-shared.ps1",
+    "test:artifacts": "node scripts/verify-artifacts.mjs",
     "test:wasmtime": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-wasmtime.ps1",
     "test": "npm run build && node --test tests/ts/*.test.mjs",
     "test:debug": "npm run build && node tests/ts/debug-smoke.mjs",

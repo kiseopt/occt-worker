@@ -108,6 +108,9 @@ export class EdgeSelectionMap {
 
   constructor(mesh: EdgeTessellation) {
     if (mesh.positions.length % 3 !== 0) throw new TypeError("Edge mesh positions must contain xyz values");
+    if (mesh.positions.some((value) => !Number.isFinite(value))) {
+      throw new RangeError("Edge mesh positions must be finite");
+    }
     if (mesh.edgeGroups.length % 3 !== 0) throw new TypeError("Mesh edgeGroups must contain u32 triples");
     const vertexCount = mesh.positions.length / 3;
     this.#vertexEdges = new Uint32Array(vertexCount);
@@ -154,10 +157,17 @@ function validateMesh(mesh: Tessellation): number {
   if (mesh.positions.length % 3 !== 0 || mesh.normals.length !== mesh.positions.length) {
     throw new TypeError("Mesh positions and normals must contain matching xyz values");
   }
+  if (mesh.positions.some((value) => !Number.isFinite(value))
+      || mesh.normals.some((value) => !Number.isFinite(value))) {
+    throw new RangeError("Mesh positions and normals must be finite");
+  }
   const vertexCount = mesh.positions.length / 3;
   if (mesh.indices.length % 3 !== 0) throw new TypeError("Mesh indices must contain triangles");
   if (mesh.uvs !== undefined && mesh.uvs.length !== vertexCount * 2) {
     throw new TypeError("Mesh UVs must contain one uv pair per vertex");
+  }
+  if (mesh.uvs?.some((value) => !Number.isFinite(value))) {
+    throw new RangeError("Mesh UVs must be finite");
   }
   if (mesh.faceGroups.length % 3 !== 0) throw new TypeError("Mesh faceGroups must contain u32 triples");
   for (const index of mesh.indices) {

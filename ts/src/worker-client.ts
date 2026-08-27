@@ -1,4 +1,6 @@
 import { BaseClient } from "./client.js";
+import { COOPERATIVE_OPERATIONS, type OperationName } from "./generated.js";
+import { collectArrayBuffers } from "./protocol-codec.js";
 import {
   KernelError,
   TimeoutError,
@@ -16,7 +18,7 @@ interface WorkerLike {
 
 interface QueuedCall {
   id: number;
-  op: string;
+  op: OperationName;
   args: Record<string, unknown>;
   transfers: Transferable[];
   timeoutMs?: number;
@@ -31,33 +33,12 @@ interface QueuedCall {
   timer?: ReturnType<typeof setTimeout>;
 }
 
-const cooperativeOperations = new Set([
-  "tessellate",
-  "tessellateEdges",
-  "exportVRML",
-  "importVRML",
-  "exportSTL",
-  "importSTL",
-  "exportOBJ",
-  "importOBJ",
-  "exportPLY",
-  "importPLY",
-  "exportGLTF",
-  "importGLTF",
-  "exportIGES",
-  "importIGES",
-  "exportSTEP",
-  "importSTEP",
-  "exportSTEPDocument",
-  "importSTEPDocument",
-  "exportIGESDocument",
-  "importIGESDocument",
-]);
+const cooperativeOperations = new Set<OperationName>(COOPERATIVE_OPERATIONS);
 
 export class WorkerClient extends BaseClient {
   readonly #factory: () => WorkerLike;
   readonly #wasm: ArrayBuffer;
-  #worker!: WorkerLike;
+  #worker: WorkerLike | undefined;
   #ready!: Promise<void>;
   #rejectReady: ((reason: unknown) => void) | undefined;
   #isReady = false;
@@ -75,31 +56,38 @@ export class WorkerClient extends BaseClient {
 
   static async create(factory: () => WorkerLike, wasm: ArrayBuffer): Promise<WorkerClient> {
     const client = new WorkerClient(factory, wasm);
-    await client.#ready;
-    await client.initialize();
-    return client;
+    try {
+      await client.#ready;
+      await client.initialize();
+      return client;
+    } catch (error) {
+      client.close();
+      throw error;
+    }
   }
 
-  protected async send(
-    op: string,
+  protected async send<T>(
+    op: OperationName,
     args: Record<string, unknown>,
     options: RequestOptions = {},
-  ): Promise<unknown> {
+  ): Promise<T> {
     await this.#ready;
+    if (this.#closed) throw new Error("WorkerClient closed");
     if (options.signal?.aborted) {
       throw options.signal.reason ?? new DOMException("Worker request aborted", "AbortError");
     }
     const id = this.#nextId++;
-    const transfers: Transferable[] = [];
-    const collect = (value: unknown): void => {
-      if (value instanceof ArrayBuffer) transfers.push(value);
-      else if (Array.isArray(value)) value.forEach(collect);
-      else if (value !== null && typeof value === "object") Object.values(value).forEach(collect);
-    };
-    collect(args);
+    const transfers: Transferable[] = collectArrayBuffers(args);
 
-    return new Promise((resolve, reject) => {
-      const call: QueuedCall = { id, op, args, transfers, resolve, reject };
+    return new Promise<T>((resolve, reject) => {
+      const call: QueuedCall = {
+        id,
+        op,
+        args,
+        transfers,
+        resolve: (value) => resolve(value as T),
+        reject,
+      };
       if (options.timeoutMs !== undefined) call.timeoutMs = options.timeoutMs;
       if (options.onProgress !== undefined) call.onProgress = options.onProgress;
       if (options.outputBuffers !== undefined) call.outputBuffers = options.outputBuffers;
@@ -133,7 +121,7 @@ export class WorkerClient extends BaseClient {
   }
 
   async requestShared<T>(
-    op: string,
+    op: OperationName,
     args: Record<string, unknown>,
     timeoutOrOptions?: number | Omit<RequestOptions, "outputBuffers">,
   ): Promise<SharedBufferResult<T>> {
@@ -143,13 +131,14 @@ export class WorkerClient extends BaseClient {
     const options = typeof timeoutOrOptions === "number"
       ? { timeoutMs: timeoutOrOptions, outputBuffers: "shared" as const }
       : { ...timeoutOrOptions, outputBuffers: "shared" as const };
-    return await this.request<T>(op, args, options) as SharedBufferResult<T>;
+    return await this.requestUnsafe<T>(op, args, options) as SharedBufferResult<T>;
   }
 
   close(): void {
     if (this.#closed) return;
     this.#closed = true;
-    this.#worker.terminate();
+    this.#worker?.terminate();
+    this.#worker = undefined;
     const error = new Error("WorkerClient closed");
     this.#rejectReady?.(error);
     this.#rejectReady = undefined;
@@ -159,7 +148,15 @@ export class WorkerClient extends BaseClient {
 
   #startWorker(): void {
     this.#isReady = false;
-    const worker = this.#factory();
+    let worker: WorkerLike;
+    try {
+      worker = this.#factory();
+    } catch (error) {
+      this.#rejectReady = undefined;
+      this.#ready = Promise.reject(error);
+      void this.#ready.catch(() => undefined);
+      return;
+    }
     this.#worker = worker;
     this.#ready = new Promise((resolve, reject) => {
       this.#rejectReady = reject;
@@ -237,14 +234,16 @@ export class WorkerClient extends BaseClient {
   }
 
   #restart(reason: unknown): void {
-    this.#worker.terminate();
+    this.#worker?.terminate();
+    this.#worker = undefined;
     this.#failCalls(reason);
     this.invalidateEpoch();
     this.#startWorker();
   }
 
   #dispatchNext(): void {
-    if (!this.#isReady || this.#closed || this.#active !== undefined) return;
+    const worker = this.#worker;
+    if (!this.#isReady || this.#closed || this.#active !== undefined || worker === undefined) return;
     const call = this.#queue.shift();
     if (call === undefined) return;
     this.#active = call;
@@ -254,7 +253,7 @@ export class WorkerClient extends BaseClient {
       }, call.timeoutMs);
     }
     try {
-      this.#worker.postMessage(
+      worker.postMessage(
         {
           type: "call",
           id: call.id,
@@ -280,6 +279,7 @@ export class WorkerClient extends BaseClient {
   ): void {
     if (worker !== this.#worker || this.#isReady) return;
     worker.terminate();
+    this.#worker = undefined;
     this.#rejectReady = undefined;
     reject(reason);
   }

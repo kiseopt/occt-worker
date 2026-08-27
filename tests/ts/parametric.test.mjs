@@ -7,6 +7,7 @@ import {
   evaluateExpression,
   resolvePersistentSubshape,
   resolveParameters,
+  validateSubshapeReferences,
 } from "../../dist/index.js";
 
 const wasm = await readFile(new URL("../../wasm/occt-worker.wasm", import.meta.url));
@@ -32,6 +33,20 @@ test("safe arithmetic expressions resolve named parameter dependencies", () => {
   assert.throws(
     () => resolveParameters({ first: "second + 1", second: "first + 1" }),
     /Parameter dependency cycle: first -> second -> first/,
+  );
+});
+
+test("subshape reference validation rejects source cycles", () => {
+  const features = [
+    { id: "a", type: "box", size: [1, 1, 1] },
+    { id: "b", type: "box", size: [1, 1, 1] },
+  ];
+  assert.throws(
+    () => validateSubshapeReferences([
+      { id: "first", feature: "a", type: "face", source: "second" },
+      { id: "second", feature: "b", type: "face", source: "first" },
+    ], features),
+    /source cycle/,
   );
 });
 
@@ -91,13 +106,37 @@ test("feature DAG rejects unknown dependencies and cycles before allocating a sc
   });
   await assert.rejects(cyclic.recompute(), /Feature dependency cycle: first -> second -> first/);
 
-  await assert.rejects(
-    ParametricModel.fromJSON(
+  assert.throws(
+    () => ParametricModel.fromJSON(
       client,
       { parameters: {}, features: [{ id: "bad", type: "script" }] },
-    ).recompute(),
-    /Unsupported feature type "script"/,
+    ),
+    /supported parametric feature type/,
   );
+});
+
+test("subshape resolution failures produce one failed feature diagnostic", async () => {
+  const scope = {
+    makeBox: async () => ({ shapeId: 1 }),
+    end: async () => undefined,
+  };
+  const client = {
+    beginScope: async () => scope,
+    getSubShapes: async () => { throw new Error("subshape catalog unavailable"); },
+  };
+  const model = new ParametricModel(client, {
+    parameters: {},
+    features: [{ id: "base", type: "box", size: [1, 1, 1] }],
+    subshapeReferences: [{ id: "face", feature: "base", type: "face", initialIndex: 0 }],
+  });
+
+  await assert.rejects(model.recompute(), /subshape catalog unavailable/);
+  assert.deepEqual(model.getFeatureDiagnostics(), [{
+    id: "base",
+    type: "box",
+    status: "failed",
+    message: "subshape catalog unavailable",
+  }]);
 });
 
 test("parameter changes recompute an out-of-order feature DAG in a fresh scope", async () => {
@@ -596,7 +635,7 @@ test("JSON serialization restores expressions and boolean feature dependencies",
       parameters: {},
       features: [{ id: "invalid", type: "box", size: [1, 1, 1], suppressed: "false" }],
     }),
-    /Feature "invalid" suppressed must be boolean/,
+    /features\[0\]\.suppressed must be a boolean/,
   );
 
   await restored.recompute();
@@ -605,6 +644,33 @@ test("JSON serialization restores expressions and boolean feature dependencies",
 
   await restored.dispose();
   assert.equal((await client.stats()).liveShapeHandles, 0);
+});
+
+test("fromJSON validates parametric feature variants and nested definitions", () => {
+  const client = {};
+  for (const [definition, message] of [
+    [{ parameters: {}, features: [{ id: "box", type: "box", size: [1, 2] }] }, /size must be an array of 3 values/],
+    [{ parameters: {}, features: [{ id: "future", type: "futureFeature" }] }, /supported parametric feature type/],
+    [{ parameters: {}, features: [{ id: "boss", type: "localPrism", base: "base", faceIndices: [], direction: [0, 0, 1], mode: "fromUntil", from: "start" }] }, /until must be present/],
+    [{ parameters: {}, features: [], document: { nodes: [{ kind: "part", feature: 3 }], roots: [0] } }, /feature must be a string/],
+  ]) {
+    assert.throws(() => ParametricModel.fromJSON(client, definition), message);
+  }
+
+  const representative = {
+    parameters: { width: 4, radius: "width / 2" },
+    features: [
+      { id: "profile", type: "polygon", points: [[0, 0, 0], [1, 0, 0], [1, 1, 0]] },
+      { id: "solid", type: "extrude", input: "profile", vector: [0, 0, "width"] },
+      { id: "refined", type: "shapeUpgrade", input: "solid", mode: "area", areaMode: "maxArea", maxArea: 10 },
+    ],
+    subshapeReferences: [{ id: "top", feature: "solid", type: "face", initialIndex: 0 }],
+    document: { nodes: [{ kind: "part", feature: "refined", name: "Refined solid" }], roots: [0] },
+  };
+  assert.deepEqual(ParametricModel.fromJSON(client, representative).toJSON(), {
+    ...representative,
+    schemaVersion: 1,
+  });
 });
 
 test("serializable parametric freeform curves and surfaces recompute expressions", async () => {
