@@ -1,9 +1,15 @@
 function Get-OcctWasmBuildConfig {
   $repo = Split-Path -Parent $PSScriptRoot
+  $repoPosix = $repo.Replace('\', '/')
   $identity = Get-Content -Raw (Join-Path $repo 'protocol/artifacts.json') | ConvertFrom-Json
   return @{
     EmsdkVersion = $identity.sources.emsdk.version
-    OcctCxxFlags = @('-fwasm-exceptions', '-ffp-contract=off', '-UOCC_CONVERT_SIGNALS')
+    OcctCxxFlags = @(
+      '-fwasm-exceptions'
+      '-ffp-contract=off'
+      '-UOCC_CONVERT_SIGNALS'
+      "-ffile-prefix-map=$repoPosix=."
+    )
     OcctCMakeArguments = @(
       '-DBUILD_LIBRARY_TYPE=Static'
       '-DBUILD_RELEASE_DISABLE_EXCEPTIONS=OFF'

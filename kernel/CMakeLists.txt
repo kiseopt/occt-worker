@@ -68,7 +68,11 @@ function(kernel_common_setup theTarget)
     "${PROJECT_SOURCE_DIR}/vendor/json/single_include"
     "${OCCT_INCLUDE_DIR}"
   )
-  target_compile_options(${theTarget} PRIVATE -fwasm-exceptions -ffp-contract=off)
+  target_compile_options(${theTarget} PRIVATE
+    -fwasm-exceptions
+    -ffp-contract=off
+    "-ffile-prefix-map=${PROJECT_SOURCE_DIR}=."
+  )
 endfunction()
 
 option(KERNEL_BUILD_SHARED "Build shared Main + Side targets instead of standalone full" OFF)

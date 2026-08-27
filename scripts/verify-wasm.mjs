@@ -1,8 +1,19 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 const wasmPath = new URL("../wasm/occt-worker.wasm", import.meta.url);
 const bytes = await readFile(wasmPath);
+const repositoryPath = resolve(fileURLToPath(new URL("../", import.meta.url)));
+const embeddedText = bytes.toString("latin1");
+const embeddedRepositoryPath = [repositoryPath, repositoryPath.replaceAll("\\", "/")]
+  .find((candidate) => embeddedText.includes(candidate));
+if (embeddedRepositoryPath !== undefined) {
+  throw new Error(
+    `wasm/occt-worker.wasm contains the build path ${embeddedRepositoryPath}; compile with a file prefix map before publishing`,
+  );
+}
 const expectedSurface = JSON.parse(await readFile(new URL("../protocol/wasm-surface.json", import.meta.url), "utf8"));
 const module = new WebAssembly.Module(bytes);
 const imports = WebAssembly.Module.imports(module).map(({ module: namespace, name, kind }) => ({
