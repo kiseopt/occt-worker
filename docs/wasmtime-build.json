@@ -1,8 +1,8 @@
 {
   "artifact": "wasm/occt-worker.wasmtime.wasm",
   "transform": "Binaryen --translate-to-exnref",
-  "sizeBytes": 30400977,
-  "sha256": "12d610ad659cf4343399d483cceccde3ce8b80ac099abcd9ed70ff3280673ae4",
+  "sizeBytes": 30400961,
+  "sha256": "88d16d4df903a0b70f38abaa9e3d501458f7ff4dc0f721e854b569a3477cad8c",
   "testedWith": "wasmtime 47.0.3 (5554cc1a6 2026-07-31)",
   "smoke": [
     "initialize",

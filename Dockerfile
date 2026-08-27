@@ -78,7 +78,8 @@ RUN source "${EMSDK}/emsdk_env.sh" \
          -DBUILD_MODULE_ModelingAlgorithms=ON -DBUILD_MODULE_Visualization=OFF \
          -DBUILD_MODULE_ApplicationFramework=OFF -DBUILD_MODULE_DataExchange=OFF \
          -DBUILD_MODULE_Draw=OFF \
-         '-DCMAKE_CXX_FLAGS=-fwasm-exceptions -ffp-contract=off -UOCC_CONVERT_SIGNALS' \
+         '-DCMAKE_C_FLAGS=-ffile-prefix-map=/src=.' \
+         '-DCMAKE_CXX_FLAGS=-fwasm-exceptions -ffp-contract=off -UOCC_CONVERT_SIGNALS -ffile-prefix-map=/src=.' \
     && cmake --build build/release/occt-build --target install --parallel
 
 RUN source "${EMSDK}/emsdk_env.sh" \
@@ -122,7 +123,8 @@ RUN source "${EMSDK}/emsdk_env.sh" \
          -DBUILD_MODULE_ModelingAlgorithms=ON -DBUILD_MODULE_Visualization=OFF \
          -DBUILD_MODULE_ApplicationFramework=OFF -DBUILD_MODULE_DataExchange=OFF \
          -DBUILD_MODULE_Draw=OFF \
-         '-DCMAKE_CXX_FLAGS=-fPIC -fwasm-exceptions -ffp-contract=off -UOCC_CONVERT_SIGNALS' \
+         '-DCMAKE_C_FLAGS=-ffile-prefix-map=/src=.' \
+         '-DCMAKE_CXX_FLAGS=-fPIC -fwasm-exceptions -ffp-contract=off -UOCC_CONVERT_SIGNALS -ffile-prefix-map=/src=.' \
     && cmake --build build/release/shared/occt-build-pic --target install --parallel
 
 RUN source "${EMSDK}/emsdk_env.sh" \

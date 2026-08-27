@@ -1,8 +1,8 @@
 {
   "artifact": "wasm/occt-worker.wasm",
   "standaloneReactor": true,
-  "sizeBytes": 27669541,
-  "sha256": "0ffa7a0bf0fbf0916c664017615a18aa4b60cc5f8d8dc354b5c864a92335e24e",
+  "sizeBytes": 27669529,
+  "sha256": "d6d991b23e396cad83635f319b11bfd1f80db4a0f5a04771416fcb80d9e120aa",
   "imports": [
     {
       "module": "env",

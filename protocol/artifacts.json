@@ -39,8 +39,8 @@
     "shared-main.wasm": {
       "kind": "shared-main",
       "buildFamily": "occt-worker-shared-v1",
-      "sizeBytes": 30815571,
-      "sha256": "077a85ea2854b33aa3b718fbd0ed55ba57c27eb715a23030a997f1cde0019ce6",
+      "sizeBytes": 30815563,
+      "sha256": "0e6186b310a9ddd0f411d20258bde1a068202221158fedaeb1bff30b73bceb48",
       "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/shared-main.wasm"
     },
     "geometry-topology.side.wasm": {
@@ -95,48 +95,48 @@
       "kind": "isolated-profile",
       "profile": "core-modeling",
       "buildFamily": "occt-worker-profile-v1",
-      "sizeBytes": 18283922,
-      "sha256": "013ac27bc701ee9eb1c0e510ed8c221058cb3b2ca62f0d382264a3c09b826248",
+      "sizeBytes": 18283910,
+      "sha256": "3331fecbd163a92fe171a4ca4fe1ca191011c7cb7e3256f12211c9fe5b7e91a7",
       "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/core-modeling.wasm"
     },
     "mesh.wasm": {
       "kind": "isolated-profile",
       "profile": "mesh",
       "buildFamily": "occt-worker-profile-v1",
-      "sizeBytes": 18738378,
-      "sha256": "f665fbc32c75ce50890bc1cb95f596e71fa8f9809fef0c48dbad29241dcbb641",
+      "sizeBytes": 18738366,
+      "sha256": "6a512a0f95a3a73aa33a35facc8a9f9adc206e28f4c3ac6f1934d5cdd31da4b7",
       "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/mesh.wasm"
     },
     "exchange.wasm": {
       "kind": "isolated-profile",
       "profile": "exchange",
       "buildFamily": "occt-worker-profile-v1",
-      "sizeBytes": 15877958,
-      "sha256": "0f0cdf83fa4bb6bb4ca5408bc91e50e1ac95e5a147e50ca12eac5e1ff7702a65",
+      "sizeBytes": 15877952,
+      "sha256": "fd5924a8579c10c7a216ce5b6e940e0b45a56eda9a251bb366c2c52567017a45",
       "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/exchange.wasm"
     },
     "step-preview.wasm": {
       "kind": "isolated-profile",
       "profile": "step-preview",
       "buildFamily": "occt-worker-profile-v1",
-      "sizeBytes": 14784957,
-      "sha256": "6842b53a97ef5dfc2cf3777f0a67281d1450433fb5c9f0ce60eab48158cd68a1",
+      "sizeBytes": 14784951,
+      "sha256": "15b7c96f4f493ef19a9e9c6fabb59e6bae40fdbd3eaeae1d4afcfc46d6cb9f28",
       "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/step-preview.wasm"
     },
     "modeling-viewer.wasm": {
       "kind": "isolated-profile",
       "profile": "modeling-viewer",
       "buildFamily": "occt-worker-profile-v1",
-      "sizeBytes": 18738378,
-      "sha256": "f665fbc32c75ce50890bc1cb95f596e71fa8f9809fef0c48dbad29241dcbb641",
+      "sizeBytes": 18738366,
+      "sha256": "6a512a0f95a3a73aa33a35facc8a9f9adc206e28f4c3ac6f1934d5cdd31da4b7",
       "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/modeling-viewer.wasm"
     },
     "full.wasm": {
       "kind": "isolated-profile",
       "profile": "full-profile",
       "buildFamily": "occt-worker-profile-v1",
-      "sizeBytes": 27713560,
-      "sha256": "83cb4253ee119772f7a77750496a1db8f3196fe1bc00114bb59fbabb65ecc4db",
+      "sizeBytes": 27713548,
+      "sha256": "2a1f9130873a8346d32c5ef56d557fab7604f858ae58d41ee433f7d62ef748f3",
       "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/full.wasm"
     }
   }

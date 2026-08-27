@@ -34,6 +34,7 @@ node (Join-Path $repo 'scripts/generate-protocol.mjs')
 & emcmake cmake -S (Join-Path $repo 'occt') -B $occtBuild -G Ninja `
   "-DCMAKE_BUILD_TYPE=$Configuration" `
   "-DCMAKE_INSTALL_PREFIX=$occtInstall" `
+  "-DCMAKE_C_FLAGS=$($buildConfig.OcctCFlags -join ' ')" `
   "-DCMAKE_CXX_FLAGS=$($buildConfig.OcctCxxFlags -join ' ')" `
   @occtCMakeArguments
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -4,6 +4,9 @@ function Get-OcctWasmBuildConfig {
   $identity = Get-Content -Raw (Join-Path $repo 'protocol/artifacts.json') | ConvertFrom-Json
   return @{
     EmsdkVersion = $identity.sources.emsdk.version
+    OcctCFlags = @(
+      "-ffile-prefix-map=$repoPosix=."
+    )
     OcctCxxFlags = @(
       '-fwasm-exceptions'
       '-ffp-contract=off'

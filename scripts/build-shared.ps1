@@ -23,6 +23,7 @@ $occtInstall = Join-Path $buildRoot 'occt-install-pic'
 $kernelBuild = Join-Path $buildRoot 'kernel'
 . (Join-Path $PSScriptRoot 'build-config.ps1')
 $buildConfig = Get-OcctWasmBuildConfig
+$cFlags = $buildConfig.OcctCFlags -join ' '
 $picFlags = (@('-fPIC') + $buildConfig.OcctCxxFlags) -join ' '
 $occtCMakeArguments = $buildConfig.OcctCMakeArguments
 
@@ -37,6 +38,7 @@ if (-not $SidesOnly) {
   & emcmake cmake -S (Join-Path $repo 'occt') -B $occtBuild -G Ninja `
     "-DCMAKE_BUILD_TYPE=$Configuration" `
     "-DCMAKE_INSTALL_PREFIX=$occtInstall" `
+    "-DCMAKE_C_FLAGS=$cFlags" `
     "-DCMAKE_CXX_FLAGS=$picFlags" `
     @occtCMakeArguments
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
