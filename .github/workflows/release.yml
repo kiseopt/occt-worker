@@ -170,9 +170,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Publish npm package
         shell: pwsh
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          & npm install --global npm@11.6.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $published = $null
           try {
             $published = Invoke-RestMethod -Uri "https://registry.npmjs.org/occt-worker/$env:PACKAGE_VERSION"
