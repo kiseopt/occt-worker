@@ -5,6 +5,7 @@ const operations = JSON.parse(await readFile(new URL("../protocol/operations.jso
 const contracts = JSON.parse(await readFile(new URL("../protocol/operation-contracts.json", import.meta.url), "utf8"));
 const modules = JSON.parse(await readFile(new URL("../protocol/modules.json", import.meta.url), "utf8"));
 const artifacts = JSON.parse(await readFile(new URL("../protocol/artifacts.json", import.meta.url), "utf8"));
+const buildFlags = JSON.parse(await readFile(new URL("../protocol/build-flags.json", import.meta.url), "utf8"));
 const occtSource = artifacts.sources?.occt;
 const emsdkSource = artifacts.sources?.emsdk;
 if (artifacts.protocolVersion !== source.protocolVersion) {
@@ -296,7 +297,7 @@ await mkdir(new URL("../ts/src/", import.meta.url), { recursive: true });
 
 await writeFile(
   new URL("../ts/src/build-identity.generated.ts", import.meta.url),
-  `// Generated from protocol/artifacts.json. Do not edit.\nexport const BUILD_IDENTITY = ${JSON.stringify({ protocolVersion: artifacts.protocolVersion, pluginAbiVersion: artifacts.pluginAbiVersion, occtVersion: occtSource.version, emsdkVersion: emsdkSource.version, releaseBaseUrl: artifacts.releaseBaseUrl, buildFamilies: artifacts.buildFamilies })} as const;\n`,
+  `// Generated from protocol/artifacts.json and protocol/build-flags.json. Do not edit.\nexport const BUILD_IDENTITY = ${JSON.stringify({ protocolVersion: artifacts.protocolVersion, pluginAbiVersion: artifacts.pluginAbiVersion, occtVersion: occtSource.version, emsdkVersion: emsdkSource.version, releaseBaseUrl: artifacts.releaseBaseUrl, buildFamilies: artifacts.buildFamilies, buildFlags })} as const;\n`,
 );
 
 await writeFile(

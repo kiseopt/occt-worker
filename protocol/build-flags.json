@@ -1,0 +1,5 @@
+{
+  "threads": false,
+  "simd": false,
+  "wasmExceptions": true
+}

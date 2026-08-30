@@ -1,6 +1,7 @@
 import type { BinaryBuffer, Capabilities, MaterializedBuffer, RequestOptions } from "./types.js";
 import { mapProtocolValue, mapShapeHandles } from "./protocol-codec.js";
-import { OPERATION_RESULT_HANDLE_PATHS, type OperationName } from "./generated.js";
+import { HISTORY_SUPPORT, OPERATION_RESULT_HANDLE_PATHS, PROTOCOL_VERSION, type OperationName } from "./generated.js";
+import { BUILD_IDENTITY } from "./build-identity.generated.js";
 import { RUNTIME_CONFIG } from "./runtime-manifest.generated.js";
 import type { ModulesManifest } from "./runtime-config.js";
 
@@ -217,32 +218,31 @@ export class GeometryEngine {
 
   async capabilities(): Promise<Capabilities> {
     this.#assertActive();
-    const profileIds = [...this.#profiles.keys()];
-    if (profileIds.length === 0) {
+    if (this.#profiles.size === 0) {
       throw new EngineError("UnsupportedCapability", "no profiles are registered");
     }
-    const capabilities = await Promise.all(profileIds.map(async (profileId) => {
-      const runtime = await this.#runtimeFor(profileId);
-      return runtime.request<Capabilities>("capabilities", {});
-    }));
-    this.#assertActive();
-    const available = this.availableOperations();
-    const operations = available.filter((operation) =>
-      capabilities.some((entry) => entry.ops.includes(operation)));
+    // Reports manifest and build-time identity only. Use probeProfile() when
+    // checking capabilities actually registered by a WASM artifact.
+    const operations = this.availableOperations();
     const historySupport: Capabilities["historySupport"] = {};
-    for (const operation of operations) {
-      const support = capabilities.find((entry) => entry.ops.includes(operation))
-        ?.historySupport[operation];
-      if (support !== undefined) historySupport[operation] = support;
-    }
+    for (const operation of operations) historySupport[operation] = HISTORY_SUPPORT[operation];
     return {
-      protocolVersion: capabilities[0]!.protocolVersion,
-      kernelVersion: capabilities[0]!.kernelVersion,
-      occtVersion: capabilities[0]!.occtVersion,
+      protocolVersion: PROTOCOL_VERSION,
+      kernelVersion: PROTOCOL_VERSION,
+      occtVersion: BUILD_IDENTITY.occtVersion,
       ops: operations,
       historySupport,
-      buildFlags: { ...capabilities[0]!.buildFlags },
+      buildFlags: { ...BUILD_IDENTITY.buildFlags },
     };
+  }
+
+  async probeProfile(profileId: string): Promise<Capabilities> {
+    this.#assertActive();
+    if (!this.#profiles.has(profileId)) {
+      throw new EngineError("UnsupportedCapability", `unknown profile '${profileId}'`);
+    }
+    const runtime = await this.#runtimeFor(profileId);
+    return runtime.request<Capabilities>("capabilities", {});
   }
 
   stats(): { shapes: number; placements: number; startedProfiles: string[] } {

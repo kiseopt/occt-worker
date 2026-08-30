@@ -83,6 +83,25 @@ test("capability routing rejects ineligible constructors and unknown operations"
   );
 });
 
+test("capabilities is static and does not start registered profiles", async () => {
+  const engine = new GeometryEngine(modules);
+  let starts = 0;
+  const factory = async () => {
+    starts += 1;
+    return { request: async () => ({}) };
+  };
+  engine.registerProfile("step-preview", "f", factory);
+  engine.registerProfile("mesh", "f", factory);
+  const before = engine.stats().startedProfiles;
+  const capabilities = await engine.capabilities();
+  assert.deepEqual(engine.stats().startedProfiles, before);
+  assert.equal(starts, 0);
+  assert.equal(capabilities.protocolVersion, "1.2.0");
+  const probed = await engine.probeProfile("mesh");
+  assert.deepEqual(probed, {});
+  assert.equal(starts, 1);
+});
+
 test("request routing ignores eligible profiles that are not registered", async () => {
   const calls = [];
   const engine = new GeometryEngine(modules);

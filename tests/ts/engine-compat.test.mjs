@@ -65,7 +65,7 @@ test("compat routes nested engine refs, materializes declared result handles, an
   await compat.close();
 });
 
-test("compat capabilities come from registered runtimes", async () => {
+test("compat capabilities are derived from the registered manifest", async () => {
   const engine = new GeometryEngine(modules);
   const runtimeCapabilities = {
     protocolVersion: "1.2.0",
@@ -80,10 +80,11 @@ test("compat capabilities come from registered runtimes", async () => {
   }));
   const compat = new EngineCompatClient(engine);
   const capabilities = await compat.initialize();
-  assert.equal(capabilities.kernelVersion, "kernel-test");
-  assert.equal(capabilities.occtVersion, "occt-test");
-  assert.deepEqual(capabilities.buildFlags, { wasmExceptions: true, source: "runtime" });
-  assert.deepEqual(capabilities.ops, ["beginScope", "capabilities", "makeBox"]);
+  assert.equal(capabilities.kernelVersion, "1.2.0");
+  assert.equal(capabilities.occtVersion, "8.0.1+git.4c2c356490");
+  assert.deepEqual(capabilities.buildFlags, { threads: false, simd: false, wasmExceptions: true });
+  assert.ok(capabilities.ops.includes("makeBox"));
+  assert.deepEqual(engine.stats().startedProfiles, []);
   await compat.close();
 });
 
