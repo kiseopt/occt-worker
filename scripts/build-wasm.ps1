@@ -29,7 +29,8 @@ if ($occtChanges) {
   $occtChanges | Write-Error
   throw 'OCCT source tree must be clean'
 }
-node (Join-Path $repo 'scripts/generate-protocol.mjs')
+& npm run generate
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # -UOCC_CONVERT_SIGNALS: OCC_CATCH_SIGNALS must not expand to setjmp. This kernel never installs
 # signal handlers, and Emscripten lowers setjmp through wasm-EH in a way that emits br_table

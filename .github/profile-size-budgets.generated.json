@@ -3,23 +3,23 @@
   "profiles": {
     "core-modeling": {
       "artifact": "core-modeling.wasm",
-      "sizeBytes": 18268899
+      "sizeBytes": 18266985
     },
     "mesh": {
       "artifact": "mesh.wasm",
-      "sizeBytes": 18722873
+      "sizeBytes": 18720952
     },
     "exchange": {
       "artifact": "exchange.wasm",
-      "sizeBytes": 15788060
+      "sizeBytes": 15741528
     },
     "preview": {
       "artifact": "preview.wasm",
-      "sizeBytes": 11045697
+      "sizeBytes": 11049627
     },
     "full-profile": {
       "artifact": "full.wasm",
-      "sizeBytes": 27586726
+      "sizeBytes": 27478954
     }
   }
 }

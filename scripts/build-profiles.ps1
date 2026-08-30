@@ -13,6 +13,9 @@ $artifactDir = Join-Path $repo 'artifacts'
 . (Join-Path $PSScriptRoot 'build-config.ps1')
 $buildConfig = Get-OcctWasmBuildConfig
 
+& npm run generate
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $occtChanges = & git -C (Join-Path $repo 'occt') status --porcelain
 if ($occtChanges) {
   $occtChanges | Write-Error
@@ -39,11 +42,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-$modules = Get-Content -Raw (Join-Path $repo 'protocol/modules.json') | ConvertFrom-Json
-foreach ($profile in $modules.profiles.PSObject.Properties) {
-  if ($null -ne $profile.Value.aliasOf) { continue }
-  $source = Join-Path $profileBuild "kernel/profile-$($profile.Name).wasm"
-  $target = Join-Path $artifactDir $profile.Value.artifact
+$topology = Get-Content -Raw (Join-Path $repo 'scripts/profile-topology.generated.json') | ConvertFrom-Json
+foreach ($profile in $topology.buildProfiles) {
+  $source = Join-Path $profileBuild "kernel/$($profile.target).wasm"
+  $target = Join-Path $artifactDir $profile.artifact
   if ($Configuration -eq 'Release') {
     & (Join-Path $emsdk 'upstream/bin/wasm-opt.exe') $source -O3 --all-features --converge -o $target
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

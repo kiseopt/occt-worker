@@ -1,8 +1,8 @@
 {
   "artifact": "wasm/occt-worker.wasm",
   "standaloneReactor": true,
-  "sizeBytes": 27578820,
-  "sha256": "9cd487a7476d069eef5018d6fd601d88692702e1f23b6cecf2f93e928dbced48",
+  "sizeBytes": 27478954,
+  "sha256": "820845afcb733d5e15b8bb62f367b671c8dde14297638f9e0b9ff51065b5d21a",
   "imports": [
     {
       "module": "env",
@@ -16,17 +16,17 @@
     },
     {
       "module": "env",
-      "name": "emscripten_get_preloaded_image_data",
-      "kind": "function"
-    },
-    {
-      "module": "env",
       "name": "emscripten_get_callstack",
       "kind": "function"
     },
     {
       "module": "env",
       "name": "OSD_MemInfo_getModuleHeapLength",
+      "kind": "function"
+    },
+    {
+      "module": "env",
+      "name": "emscripten_get_preloaded_image_data",
       "kind": "function"
     },
     {

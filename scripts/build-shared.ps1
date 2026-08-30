@@ -27,6 +27,9 @@ $cFlags = $buildConfig.OcctCFlags -join ' '
 $picFlags = (@('-fPIC') + $buildConfig.OcctCxxFlags) -join ' '
 $occtCMakeArguments = $buildConfig.OcctCMakeArguments
 
+& npm run generate
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $occtChanges = & git -C (Join-Path $repo 'occt') status --porcelain
 if ($occtChanges) {
   $occtChanges | Write-Error
@@ -65,13 +68,11 @@ $artifactDir = Join-Path $repo 'artifacts'
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 Copy-Item -Force (Join-Path $kernelBuild 'kernel/shared-main.mjs') (Join-Path $artifactDir 'shared-main.mjs')
 Copy-Item -Force (Join-Path $kernelBuild 'kernel/shared-main.wasm') (Join-Path $artifactDir 'shared-main.wasm')
-$modules = Get-Content -Raw (Join-Path $repo 'protocol/modules.json') | ConvertFrom-Json
-foreach ($side in $modules.artifactModuleCandidates.PSObject.Properties) {
-  $targetName = $side.Name
-  $targetGroup = $side.Name -replace '\.side\.wasm$', ''
+$topology = Get-Content -Raw (Join-Path $repo 'scripts/profile-topology.generated.json') | ConvertFrom-Json
+foreach ($side in $topology.sides) {
   Copy-Item -Force `
-    (Join-Path $kernelBuild "kernel/shared-side-$targetGroup.wasm") `
-    (Join-Path $artifactDir $targetName)
+    (Join-Path $kernelBuild "kernel/$($side.target).wasm") `
+    (Join-Path $artifactDir $side.artifact)
 }
 & node (Join-Path $repo 'scripts/verify-artifacts.mjs') --write --write-family shared
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

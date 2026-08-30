@@ -83,6 +83,7 @@ RUN source "${EMSDK}/emsdk_env.sh" \
 
 RUN source "${EMSDK}/emsdk_env.sh" \
     && export PATH="${EMSDK}:${EMSDK}/upstream/emscripten:${EMSDK}/upstream/bin:${PATH}" \
+    && npm run generate \
     && emcmake cmake -S . -B build/release/kernel -G Ninja \
          -DCMAKE_BUILD_TYPE=Release -DOCCT_ROOT=/src/build/release/occt-install \
     && cmake --build build/release/kernel --parallel \
@@ -96,14 +97,15 @@ FROM full AS profiles
 
 RUN source "${EMSDK}/emsdk_env.sh" \
     && export PATH="${EMSDK}:${EMSDK}/upstream/emscripten:${EMSDK}/upstream/bin:${PATH}" \
+    && npm run generate \
     && emcmake cmake -S . -B build/release/profiles -G Ninja \
          -DCMAKE_BUILD_TYPE=Release -DOCCT_ROOT=/src/build/release/occt-install \
          -DKERNEL_BUILD_PROFILES=ON \
     && cmake --build build/release/profiles --parallel \
     && mkdir -p artifacts \
-    && node -e 'const profiles = require("./protocol/modules.json").profiles; for (const [id, profile] of Object.entries(profiles)) if (profile.aliasOf === undefined) console.log(`${id}\t${profile.artifact}`)' \
+    && node -e 'const profiles = require("./scripts/profile-topology.generated.json").buildProfiles; for (const profile of profiles) console.log(`${profile.target}\t${profile.artifact}`)' \
        | while IFS=$'\t' read -r profile artifact; do \
-         wasm-opt "build/release/profiles/kernel/profile-${profile}.wasm" -O3 --all-features --converge \
+         wasm-opt "build/release/profiles/kernel/${profile}.wasm" -O3 --all-features --converge \
            -o "artifacts/${artifact}"; \
        done
 
@@ -129,6 +131,7 @@ RUN source "${EMSDK}/emsdk_env.sh" \
 
 RUN source "${EMSDK}/emsdk_env.sh" \
     && export PATH="${EMSDK}:${EMSDK}/upstream/emscripten:${EMSDK}/upstream/bin:${PATH}" \
+    && npm run generate \
     && emcmake cmake -S . -B build/release/shared/kernel -G Ninja \
          -DCMAKE_BUILD_TYPE=Release \
          -DOCCT_ROOT=/src/build/release/shared/occt-install-pic \
@@ -137,12 +140,10 @@ RUN source "${EMSDK}/emsdk_env.sh" \
     && mkdir -p artifacts \
     && cp build/release/shared/kernel/kernel/shared-main.mjs artifacts/shared-main.mjs \
     && cp build/release/shared/kernel/kernel/shared-main.wasm artifacts/shared-main.wasm \
-    && cp build/release/shared/kernel/kernel/shared-side-geometry_topology.wasm artifacts/geometry-topology.side.wasm \
-    && cp build/release/shared/kernel/kernel/shared-side-modeling.wasm artifacts/modeling.side.wasm \
-    && cp build/release/shared/kernel/kernel/shared-side-algorithms.wasm artifacts/algorithms.side.wasm \
-    && cp build/release/shared/kernel/kernel/shared-side-mesh.wasm artifacts/mesh.side.wasm \
-    && cp build/release/shared/kernel/kernel/shared-side-exchange_mesh.wasm artifacts/exchange-mesh.side.wasm \
-    && cp build/release/shared/kernel/kernel/shared-side-exchange_cad.wasm artifacts/exchange-cad.side.wasm
+    && node -e 'const sides = require("./scripts/profile-topology.generated.json").sides; for (const side of sides) console.log(`${side.target}\t${side.artifact}`)' \
+       | while IFS=$'\t' read -r target artifact; do \
+         cp "build/release/shared/kernel/kernel/${target}.wasm" "artifacts/${artifact}"; \
+       done
 
 FROM shared AS build-all
 COPY --from=profiles /src/artifacts/ /src/artifacts/
@@ -150,9 +151,4 @@ RUN node scripts/verify-modules.mjs --quiet \
     && node scripts/verify-artifacts.mjs --write \
     && node scripts/verify-symbol-closure.mjs \
          --main artifacts/shared-main.wasm \
-         --side artifacts/geometry-topology.side.wasm \
-         --side artifacts/modeling.side.wasm \
-         --side artifacts/algorithms.side.wasm \
-         --side artifacts/mesh.side.wasm \
-         --side artifacts/exchange-mesh.side.wasm \
-         --side artifacts/exchange-cad.side.wasm
+         $(node -e 'const sides = require("./scripts/profile-topology.generated.json").sides; console.log(sides.map((side) => `--side artifacts/${side.artifact}`).join(" "))')
