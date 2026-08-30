@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>occt-worker 真机测量</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #17212b;
+        background: #f4f6f8;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+      }
+
+      main {
+        width: min(960px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #cbd3da;
+      }
+
+      h1, h2, p { margin: 0; }
+      h1 { font-size: 24px; font-weight: 700; }
+      h2 { font-size: 16px; font-weight: 700; }
+
+      .run-count { color: #54616d; font-size: 14px; }
+
+      .controls {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto auto;
+        gap: 12px;
+        align-items: end;
+        padding: 24px 0;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        color: #3e4b57;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      input, button {
+        min-height: 42px;
+        border-radius: 6px;
+        font: inherit;
+      }
+
+      input {
+        width: 100%;
+        border: 1px solid #aeb8c2;
+        padding: 0 12px;
+        background: #fff;
+        color: #17212b;
+      }
+
+      input:focus {
+        border-color: #246b63;
+        outline: 3px solid #cde7e2;
+      }
+
+      button {
+        border: 1px solid #246b63;
+        padding: 0 18px;
+        background: #246b63;
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        border-color: #586674;
+        background: #fff;
+        color: #273441;
+      }
+
+      button:disabled {
+        border-color: #b8c0c7;
+        background: #dfe4e8;
+        color: #6f7982;
+        cursor: wait;
+      }
+
+      #status {
+        min-height: 44px;
+        padding: 11px 12px;
+        border-left: 4px solid #71808d;
+        background: #e8edf1;
+        color: #35424e;
+        white-space: pre-wrap;
+      }
+
+      #status[data-state="running"] { border-color: #a86c00; background: #fff2cc; }
+      #status[data-state="complete"] { border-color: #247648; background: #dff3e8; }
+      #status[data-state="error"] { border-color: #b3261e; background: #fde7e5; color: #7b1712; }
+
+      .results {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 28px;
+        padding: 28px 0;
+      }
+
+      section { min-width: 0; }
+
+      table {
+        width: 100%;
+        margin-top: 12px;
+        border-collapse: collapse;
+        background: #fff;
+      }
+
+      th, td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #d8dee4;
+        text-align: left;
+        font-size: 14px;
+      }
+
+      th { width: 68%; color: #4b5965; font-weight: 600; }
+      td { color: #17212b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+      .report-area {
+        padding-top: 24px;
+        border-top: 1px solid #cbd3da;
+      }
+
+      .report-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      #report {
+        min-height: 248px;
+        margin: 12px 0 0;
+        padding: 14px;
+        overflow: auto;
+        border: 1px solid #cbd3da;
+        background: #fff;
+        color: #17212b;
+        font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 720px) {
+        main { width: min(100% - 24px, 960px); padding-top: 20px; }
+        header { align-items: start; flex-direction: column; gap: 6px; }
+        .controls { grid-template-columns: 1fr 1fr; }
+        .controls label { grid-column: 1 / -1; }
+        .results { grid-template-columns: 1fr; gap: 24px; }
+        .report-actions { align-items: stretch; flex-direction: column; }
+        .report-actions button { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>occt-worker 真机测量</h1>
+        <p class="run-count">每项 3 次，显示中位数</p>
+      </header>
+
+      <div class="controls">
+        <label>
+          设备
+          <input id="device" autocomplete="off" placeholder="iPad Pro M2 / iPadOS 18.5 / Safari">
+        </label>
+        <button id="measure-preview" type="button">测 preview</button>
+        <button id="measure-full" type="button" class="secondary">测 full</button>
+      </div>
+
+      <p id="status" data-state="idle">等待测量</p>
+
+      <div class="results">
+        <section aria-labelledby="preview-title">
+          <h2 id="preview-title">preview</h2>
+          <table><tbody id="preview-results"></tbody></table>
+        </section>
+        <section aria-labelledby="full-title">
+          <h2 id="full-title">full</h2>
+          <table><tbody id="full-results"></tbody></table>
+        </section>
+      </div>
+
+      <section class="report-area" aria-labelledby="report-title">
+        <div class="report-actions">
+          <h2 id="report-title">结果文本</h2>
+          <button id="copy-results" type="button" disabled>复制全部结果</button>
+        </div>
+        <pre id="report">preview 和 full 完成后生成</pre>
+      </section>
+    </main>
+    <script type="module" src="./measure.mjs"></script>
+  </body>
+</html>
