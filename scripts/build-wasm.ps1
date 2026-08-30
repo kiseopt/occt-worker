@@ -54,7 +54,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $builtArtifact = Join-Path $kernelBuild 'kernel/occt-worker.wasm'
 if ($Configuration -eq 'Release') {
   $optimizedArtifact = Join-Path $kernelBuild 'kernel/occt-worker.optimized.wasm'
-  & (Join-Path $emsdk 'upstream/bin/wasm-opt.exe') $builtArtifact -O3 --all-features -o $optimizedArtifact
+    & (Join-Path $emsdk 'upstream/bin/wasm-opt.exe') $builtArtifact -O3 --all-features --converge -o $optimizedArtifact
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   $builtArtifact = $optimizedArtifact
 }

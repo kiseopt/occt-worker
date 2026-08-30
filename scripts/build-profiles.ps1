@@ -44,7 +44,7 @@ foreach ($profile in $modules.profiles.PSObject.Properties) {
   $source = Join-Path $profileBuild "kernel/profile-$($profile.Name).wasm"
   $target = Join-Path $artifactDir $profile.Value.artifact
   if ($Configuration -eq 'Release') {
-    & (Join-Path $emsdk 'upstream/bin/wasm-opt.exe') $source -O3 --all-features -o $target
+    & (Join-Path $emsdk 'upstream/bin/wasm-opt.exe') $source -O3 --all-features --converge -o $target
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   } else {
     Copy-Item -Force $source $target

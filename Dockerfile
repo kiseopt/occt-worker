@@ -86,7 +86,7 @@ RUN source "${EMSDK}/emsdk_env.sh" \
     && emcmake cmake -S . -B build/release/kernel -G Ninja \
          -DCMAKE_BUILD_TYPE=Release -DOCCT_ROOT=/src/build/release/occt-install \
     && cmake --build build/release/kernel --parallel \
-    && wasm-opt build/release/kernel/kernel/occt-worker.wasm -O3 --all-features \
+    && wasm-opt build/release/kernel/kernel/occt-worker.wasm -O3 --all-features --converge \
          -o build/release/kernel/kernel/occt-worker.optimized.wasm \
     && mkdir -p wasm \
     && cp build/release/kernel/kernel/occt-worker.optimized.wasm wasm/occt-worker.wasm \
@@ -102,7 +102,7 @@ RUN source "${EMSDK}/emsdk_env.sh" \
     && cmake --build build/release/profiles --parallel \
     && mkdir -p artifacts \
     && for profile in core-modeling mesh exchange step-preview modeling-viewer full; do \
-         wasm-opt "build/release/profiles/kernel/profile-${profile}.wasm" -O3 --all-features \
+         wasm-opt "build/release/profiles/kernel/profile-${profile}.wasm" -O3 --all-features --converge \
            -o "artifacts/${profile}.wasm"; \
        done
 
