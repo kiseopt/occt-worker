@@ -136,7 +136,7 @@
       th { width: 68%; color: #4b5965; font-weight: 600; }
       td { color: #17212b; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-      .limit-test, .report-area {
+      .long-run-test, .limit-test, .report-area {
         padding-top: 24px;
         border-top: 1px solid #cbd3da;
       }
@@ -149,7 +149,7 @@
         margin-top: 16px;
       }
 
-      #limit-status {
+      #long-run-status, #limit-status {
         min-height: 44px;
         margin-top: 12px;
         padding: 11px 12px;
@@ -159,11 +159,11 @@
         white-space: pre-wrap;
       }
 
-      #limit-status[data-state="running"] { border-color: #a86c00; background: #fff2cc; }
-      #limit-status[data-state="complete"] { border-color: #247648; background: #dff3e8; }
-      #limit-status[data-state="error"] { border-color: #b3261e; background: #fde7e5; color: #7b1712; }
+      #long-run-status[data-state="running"], #limit-status[data-state="running"] { border-color: #a86c00; background: #fff2cc; }
+      #long-run-status[data-state="complete"], #limit-status[data-state="complete"] { border-color: #247648; background: #dff3e8; }
+      #long-run-status[data-state="error"], #limit-status[data-state="error"] { border-color: #b3261e; background: #fde7e5; color: #7b1712; }
 
-      #limit-report {
+      #long-run-report, #limit-report {
         min-height: 122px;
         margin: 12px 0 24px;
         padding: 14px;
@@ -236,6 +236,15 @@
           <table><tbody id="full-results"></tbody></table>
         </section>
       </div>
+
+      <section class="long-run-test" aria-labelledby="long-run-title">
+        <div class="report-actions">
+          <h2 id="long-run-title">长时内存回归</h2>
+          <button id="run-long-run" type="button">运行 full 长时回归</button>
+        </div>
+        <p id="long-run-status" data-state="idle">等待测试</p>
+        <pre id="long-run-report">测试完成后生成</pre>
+      </section>
 
       <section class="limit-test" aria-labelledby="limit-title">
         <h2 id="limit-title">内存上限二分测试</h2>

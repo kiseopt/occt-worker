@@ -6,6 +6,9 @@ const previewButton = document.querySelector("#measure-preview");
 const fullButton = document.querySelector("#measure-full");
 const copyButton = document.querySelector("#copy-results");
 const report = document.querySelector("#report");
+const longRunButton = document.querySelector("#run-long-run");
+const longRunStatus = document.querySelector("#long-run-status");
+const longRunReport = document.querySelector("#long-run-report");
 const limitCandidate = document.querySelector("#limit-candidate");
 const limitButton = document.querySelector("#run-limit-test");
 const limitStatus = document.querySelector("#limit-status");
@@ -85,6 +88,7 @@ function formatNumber(value) {
 function setBusy(busy) {
   previewButton.disabled = busy;
   fullButton.disabled = busy;
+  longRunButton.disabled = busy;
   limitButton.disabled = busy;
 }
 
@@ -191,6 +195,66 @@ async function copyResults() {
   } catch (error) {
     status.dataset.state = "error";
     status.textContent = error instanceof Error ? error.message : String(error);
+  }
+}
+
+function runLongRunWorker() {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(workerUrl, { type: "module" });
+    worker.addEventListener("message", (event) => {
+      if (event.data.type === "long-run-progress") {
+        longRunStatus.textContent = `full: 第 ${event.data.round}/${event.data.total} 轮`;
+        return;
+      }
+      worker.terminate();
+      if (event.data.type === "long-run-result") {
+        resolve(event.data.result);
+      } else if (event.data.type === "error") {
+        reject(new Error(event.data.error));
+      }
+    });
+    worker.addEventListener("error", (event) => {
+      worker.terminate();
+      reject(new Error(event.message));
+    }, { once: true });
+    worker.postMessage({ mode: "long-run", profile: "full" });
+  });
+}
+
+async function runLongRunTest() {
+  if (device.value.trim() === "") {
+    longRunStatus.dataset.state = "error";
+    longRunStatus.textContent = "请先填写设备型号、系统版本和浏览器";
+    device.focus();
+    return;
+  }
+  setBusy(true);
+  longRunStatus.dataset.state = "running";
+  longRunStatus.textContent = "full: 启动";
+  longRunReport.textContent = "测试进行中";
+  try {
+    const result = await runLongRunWorker();
+    longRunReport.textContent = JSON.stringify({
+      device: device.value.trim(),
+      profile: "full",
+      rounds: result.rounds.length,
+      baseline: {
+        liveShapeHandles: result.baseline.liveShapeHandles,
+        liveBufferBytes: result.baseline.liveBufferBytes,
+      },
+      scopeReturnedToBaseline: true,
+      wasmLinearMemoryCapacityMbByRound: result.rounds.map((round) => round.linearMemoryMb),
+      postWarmupStable: result.postWarmupStable,
+      observation: "wasm 线性内存容量仅用于同设备、同负载横向观测，不是系统内存峰值",
+    }, null, 2);
+    longRunStatus.dataset.state = "complete";
+    longRunStatus.textContent = "5 轮完成，scope 统计已回到基线";
+  } catch (error) {
+    longRunStatus.dataset.state = "error";
+    longRunStatus.textContent = error instanceof Error ? error.message : String(error);
+    longRunReport.textContent = "测试失败";
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -346,6 +410,7 @@ try {
 previewButton.addEventListener("click", () => measure("preview"));
 fullButton.addEventListener("click", () => measure("full"));
 copyButton.addEventListener("click", copyResults);
+longRunButton.addEventListener("click", runLongRunTest);
 limitButton.addEventListener("click", runLimitTest);
 copyLimitButton.addEventListener("click", copyLimitResults);
 device.addEventListener("input", () => {

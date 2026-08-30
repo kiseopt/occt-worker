@@ -4,6 +4,7 @@ self.addEventListener("message", async (event) => {
   try {
     const { mode = "measure", profile, candidateMb } = event.data;
     if (profile !== "preview" && profile !== "full") throw new Error(`Unknown profile '${profile}'`);
+    if (!["measure", "limit", "long-run"].includes(mode)) throw new Error(`Unknown mode '${mode}'`);
     if (mode === "limit" && ![1536, 1280, 1024, 768].includes(candidateMb)) {
       throw new Error(`Unknown memory candidate '${candidateMb}'`);
     }
@@ -11,7 +12,8 @@ self.addEventListener("message", async (event) => {
       self.postMessage({ type: "limit-progress", stage: "加载候选产物" });
     }
 
-    const stepUrl = new URL("../../occt/data/step/screw.step", self.location.href);
+    const stepName = mode === "long-run" ? "linkrods.step" : "screw.step";
+    const stepUrl = new URL(`../../occt/data/step/${stepName}`, self.location.href);
     const stepResponse = await fetch(stepUrl);
     if (!stepResponse.ok) throw new Error(`STEP fixture request failed: HTTP ${stepResponse.status}`);
     const stepBytes = new Uint8Array(await stepResponse.arrayBuffer());
@@ -118,24 +120,66 @@ self.addEventListener("message", async (event) => {
       throw new Error("full does not register 'booleanFuse'");
     }
 
+    const importStep = (scopeId) => {
+      const input = call("createBuffer", { byteLength: stepBytes.byteLength });
+      const inputPointer = exports.k_buffer_ptr(input.bufferId);
+      if (exports.k_buffer_len(input.bufferId) !== stepBytes.byteLength || inputPointer === 0) {
+        throw new Error("STEP input buffer is unavailable");
+      }
+      new Uint8Array(memory.buffer).set(stepBytes, inputPointer);
+      try {
+        return call("importSTEP", { scopeId, data: { bufferId: input.bufferId }, unit: "mm" });
+      } finally {
+        call("freeBuffer", { bufferId: input.bufferId });
+      }
+    };
+
+    if (mode === "long-run") {
+      const baseline = call("stats", {});
+      const rounds = [];
+      for (let round = 1; round <= 5; round++) {
+        self.postMessage({ type: "long-run-progress", round, total: 5 });
+        const { scopeId } = call("beginScope", {});
+        try {
+          importStep(scopeId);
+        } finally {
+          call("endScope", { scopeId });
+        }
+        const stats = call("stats", {});
+        if (
+          stats.liveShapeHandles !== baseline.liveShapeHandles
+          || stats.liveBufferBytes !== baseline.liveBufferBytes
+        ) {
+          throw new Error(`Round ${round} did not return scope statistics to baseline`);
+        }
+        rounds.push(stats);
+      }
+      const postWarmupMemory = rounds.slice(2).map((stats) => stats.wasmMemorySize);
+      if (!postWarmupMemory.every((size) => size === postWarmupMemory[0])) {
+        throw new Error("wasm linear memory capacity kept growing after warm-up");
+      }
+      self.postMessage({
+        type: "long-run-result",
+        result: {
+          baseline,
+          rounds: rounds.map((stats) => ({
+            liveShapeHandles: stats.liveShapeHandles,
+            liveBufferBytes: stats.liveBufferBytes,
+            linearMemoryMb: stats.wasmMemorySize / MEBIBYTE,
+          })),
+          postWarmupStable: true,
+        },
+      });
+      return;
+    }
+
     const instantiateMb = memory.buffer.byteLength / MEBIBYTE;
     let maxMemoryBytes = memory.buffer.byteLength;
     const trackMemory = () => { maxMemoryBytes = Math.max(maxMemoryBytes, memory.buffer.byteLength); };
     const { scopeId } = call("beginScope", {});
     trackMemory();
 
-    const input = call("createBuffer", { byteLength: stepBytes.byteLength });
-    const inputPointer = exports.k_buffer_ptr(input.bufferId);
-    if (exports.k_buffer_len(input.bufferId) !== stepBytes.byteLength || inputPointer === 0) {
-      throw new Error("STEP input buffer is unavailable");
-    }
-    new Uint8Array(memory.buffer).set(stepBytes, inputPointer);
-    let imported;
-    try {
-      imported = call("importSTEP", { scopeId, data: { bufferId: input.bufferId }, unit: "mm" });
-    } finally {
-      call("freeBuffer", { bufferId: input.bufferId });
-    }
+    const imported = importStep(scopeId);
     trackMemory();
 
     const tessellateStarted = performance.now();

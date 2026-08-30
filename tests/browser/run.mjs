@@ -53,7 +53,30 @@ try {
   await failurePage.locator("#ui-probe").click();
   assert.equal(await failurePage.locator("#ui-result").textContent(), "alive");
 
-  console.log(JSON.stringify({ browser: browserName, triangles: value.triangles, workerSoftFailure: true }));
+  const memoryPage = await browser.newPage();
+  await memoryPage.goto(`http://127.0.0.1:${address.port}/tests/device/index.html`);
+  await memoryPage.locator("#device").fill(`${browserName} desktop memory regression`);
+  await memoryPage.locator("#run-long-run").click();
+  await memoryPage.waitForFunction(
+    () => document.querySelector("#long-run-status")?.dataset.state !== "running",
+    undefined,
+    { timeout: 180000 },
+  );
+  const memoryStatus = memoryPage.locator("#long-run-status");
+  assert.equal(await memoryStatus.getAttribute("data-state"), "complete", await memoryStatus.textContent());
+  const memoryResult = JSON.parse(await memoryPage.locator("#long-run-report").textContent());
+  assert.equal(memoryResult.scopeReturnedToBaseline, true);
+  assert.equal(memoryResult.baseline.liveShapeHandles, 0);
+  assert.equal(memoryResult.baseline.liveBufferBytes, 0);
+  assert.equal(memoryResult.postWarmupStable, true);
+
+  console.log(JSON.stringify({
+    browser: browserName,
+    triangles: value.triangles,
+    workerSoftFailure: true,
+    longRunRounds: memoryResult.rounds,
+    longRunLinearMemoryMb: memoryResult.wasmLinearMemoryCapacityMbByRound,
+  }));
 } finally {
   await browser.close();
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
