@@ -80,7 +80,7 @@ check(candidateNames.length > 0, "artifactModuleCandidates must not be empty");
 {
   const assigned = new Map();
   for (const [artifact, mods] of Object.entries(candidates)) {
-    check(Array.isArray(mods) && mods.length === 1, `artifact candidate '${artifact}' must reference exactly one semantic module`);
+    check(Array.isArray(mods) && mods.length >= 1, `artifact candidate '${artifact}' must reference at least one semantic module`);
     for (const mod of mods) {
       check(mod in semanticModules, `artifact candidate '${artifact}' references unknown semantic module '${mod}'`);
       if (assigned.has(mod)) {

@@ -77,11 +77,12 @@ const cppModuleOperations = Object.entries(modules.semanticModules)
   .join("\n");
 const cppSideIdentities = Object.entries(modules.artifactModuleCandidates)
   .map(([artifact, semanticModules]) => {
-    if (semanticModules.length !== 1) throw new Error(`${artifact} must own exactly one semantic module`);
-    const semanticModule = semanticModules[0];
-    const token = semanticModule.replaceAll("-", "_");
-    return `#define OCCT_SIDE_NAME_${token} "${artifact.replace(/\.side\.wasm$/, "")}"\n#define OCCT_SIDE_SEMANTIC_MODULE_${token} "${semanticModule}"`;
+    return semanticModules.map((semanticModule) => {
+      const token = semanticModule.replaceAll("-", "_");
+      return `#define OCCT_SIDE_NAME_${token} "${semanticModule}"\n#define OCCT_SIDE_SEMANTIC_MODULE_${token} "${semanticModule}"`;
+    }).join("\n");
   })
+  .flatMap((value) => value)
   .join("\n");
 
 const artifactDescriptors = Object.fromEntries(Object.entries(artifacts.artifacts).map(([name, descriptor]) => [

@@ -68,7 +68,7 @@ Copy-Item -Force (Join-Path $kernelBuild 'kernel/shared-main.wasm') (Join-Path $
 $modules = Get-Content -Raw (Join-Path $repo 'protocol/modules.json') | ConvertFrom-Json
 foreach ($side in $modules.artifactModuleCandidates.PSObject.Properties) {
   $targetName = $side.Name
-  $targetGroup = $side.Value[0].Replace('-', '_')
+  $targetGroup = $side.Name -replace '\.side\.wasm$', ''
   Copy-Item -Force `
     (Join-Path $kernelBuild "kernel/shared-side-$targetGroup.wasm") `
     (Join-Path $artifactDir $targetName)

@@ -14,6 +14,7 @@ export interface SideDescriptor {
   name: string;
   /** URL/path resolved relative to the worker's own module. */
   url: string;
+  semanticModules?: readonly string[];
 }
 
 export interface SharedMainFactoryOptions {
@@ -188,19 +189,9 @@ export class SharedKernelLoader {
       if (this.#module !== module || this.#epoch !== epoch) {
         throw new SharedKernelLoadError(`side '${side.name}' loaded into a stale Main epoch`, "SideLoadFailed", side.name);
       }
-      if (module._occt_host_plugin_error() !== 0 || module._occt_host_plugin_count() !== registrationCount + 1) {
+      const registrationCountExpected = side.semanticModules?.length ?? 1;
+      if (module._occt_host_plugin_error() !== 0 || module._occt_host_plugin_count() !== registrationCount + registrationCountExpected) {
         throw new SharedKernelLoadError(`side '${side.name}' descriptor registration failed`, "RegistrationFailed", side.name);
-      }
-      const expectedPluginName = side.name.endsWith(".side.wasm")
-        ? side.name.slice(0, -".side.wasm".length)
-        : side.name.replace(/\.wasm$/, "");
-      const actualPluginName = module.UTF8ToString(module._occt_host_plugin_name());
-      if (actualPluginName !== expectedPluginName) {
-        throw new SharedKernelLoadError(
-          `side '${side.name}' registered plugin '${actualPluginName}', expected '${expectedPluginName}'; check the side URL`,
-          "RegistrationFailed",
-          side.name,
-        );
       }
     };
     const scheduled = this.#sideLoadTail.then(load);

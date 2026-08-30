@@ -17,7 +17,7 @@ export interface RuntimeArtifactDescriptor extends ArtifactDescriptor {
   readonly sizeBytes: number;
   readonly buildFamily: string;
   readonly kind: "shared-glue" | "shared-main" | "shared-side" | "isolated-profile";
-  readonly semanticModule?: string;
+  readonly semanticModules?: readonly string[];
   readonly profile?: string;
 }
 

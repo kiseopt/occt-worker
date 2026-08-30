@@ -149,10 +149,9 @@ test("shared loader rejects build-family and registration failures", async () =>
   });
   await wrongSide.instantiate("main.mjs");
   await assert.rejects(
-    wrongSide.ensureSide({ name: "side", url: "side.wasm" }, "family-a"),
+    wrongSide.ensureSide({ name: "side", url: "side.wasm", semanticModules: ["a", "b"] }, "family-a"),
     (error) => error instanceof SharedKernelLoadError
-      && error.code === "RegistrationFailed"
-      && error.message.includes("check the side URL"),
+      && error.code === "RegistrationFailed",
   );
 });
 

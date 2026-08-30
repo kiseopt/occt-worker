@@ -41,7 +41,7 @@ const expectedArtifacts = new Map([
   ["shared-main.wasm", { kind: "shared-main", buildFamily: manifest.buildFamilies?.shared }],
   ...Object.entries(modules.artifactModuleCandidates ?? {}).map(([name, semanticModules]) => [
     name,
-    { kind: "shared-side", buildFamily: manifest.buildFamilies?.shared, semanticModule: semanticModules[0] },
+    { kind: "shared-side", buildFamily: manifest.buildFamilies?.shared, semanticModules },
   ]),
   ...Object.entries(modules.profiles ?? {}).map(([profile, definition]) => [
     definition.artifact,
@@ -57,8 +57,10 @@ for (const [name, descriptor] of artifactEntries) {
   if (expected !== undefined) {
     check(descriptor.kind === expected.kind, `${name}: kind must be ${expected.kind}`);
     check(descriptor.buildFamily === expected.buildFamily, `${name}: buildFamily does not match module topology`);
-    if (expected.semanticModule !== undefined) {
-      check(descriptor.semanticModule === expected.semanticModule, `${name}: semantic module identity mismatch`);
+    if (expected.semanticModules !== undefined) {
+      const actual = Array.isArray(descriptor.semanticModules) ? [...descriptor.semanticModules].sort() : [];
+      const required = [...expected.semanticModules].sort();
+      check(JSON.stringify(actual) === JSON.stringify(required), `${name}: semantic module identity mismatch`);
     }
     if (expected.profile !== undefined) {
       check(descriptor.profile === expected.profile, `${name}: profile identity mismatch`);

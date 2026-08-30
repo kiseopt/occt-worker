@@ -56,7 +56,11 @@ export class SharedClient extends BaseClient {
       options.mainWasmUrl ?? resolveArtifact(config.mainWasm, options),
       ...config.sides.map((side) => resolveArtifact(side, options)),
     ]);
-    const sides = config.sides.map((side, index) => ({ name: side.name, url: sideUrls[index]! }));
+    const sides = config.sides.map((side, index) => ({
+      name: side.name,
+      url: sideUrls[index]!,
+      ...(side.semanticModules === undefined ? {} : { semanticModules: side.semanticModules }),
+    }));
     const sideNames = new Set<string>();
     for (const side of sides) {
       if (sideNames.has(side.name)) throw new TypeError(`Duplicate shared side '${side.name}'`);

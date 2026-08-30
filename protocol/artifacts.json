@@ -44,7 +44,9 @@
     },
     "geometry-topology.side.wasm": {
       "kind": "shared-side",
-      "semanticModule": "geometry-topology",
+      "semanticModules": [
+        "geometry-topology"
+      ],
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 316133,
       "sha256": "853d49ff6b4f9be097af8424980c61bfd65aeebac2077e037ce2baa71b22dab8",
@@ -52,7 +54,9 @@
     },
     "modeling.side.wasm": {
       "kind": "shared-side",
-      "semanticModule": "modeling",
+      "semanticModules": [
+        "modeling"
+      ],
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 213285,
       "sha256": "ee997597fe9c40fe34f154641bb051aa7c94dbbc78d59cea162405ba4609490c",
@@ -60,7 +64,9 @@
     },
     "algorithms.side.wasm": {
       "kind": "shared-side",
-      "semanticModule": "algorithms",
+      "semanticModules": [
+        "algorithms"
+      ],
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 252542,
       "sha256": "8724953de8771e902c282ca205589e30c6710c739acf134f8500962baab05b5b",
@@ -68,7 +74,9 @@
     },
     "mesh.side.wasm": {
       "kind": "shared-side",
-      "semanticModule": "mesh",
+      "semanticModules": [
+        "mesh"
+      ],
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 56614,
       "sha256": "6c84c6039fd8608add29e38a04e3b56ab940267913357961efc0cb86952cf683",
@@ -76,7 +84,9 @@
     },
     "exchange-mesh.side.wasm": {
       "kind": "shared-side",
-      "semanticModule": "exchange-mesh",
+      "semanticModules": [
+        "exchange-mesh"
+      ],
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 442544,
       "sha256": "20905974da6e0de7d09dfe048b2b54be42f57468166241e35a05fd20589d8f76",
@@ -84,7 +94,9 @@
     },
     "exchange-cad.side.wasm": {
       "kind": "shared-side",
-      "semanticModule": "exchange-cad",
+      "semanticModules": [
+        "exchange-cad"
+      ],
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 351414,
       "sha256": "1984c408d8ef121f11e82b98907c212ce27e665149562e9c65cd9cf752b12fdb",
