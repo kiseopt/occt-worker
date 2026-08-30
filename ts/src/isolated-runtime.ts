@@ -1,7 +1,8 @@
 import { WorkerClient } from "./worker-client.js";
+import { assertOperationSet } from "./capability-assertion.js";
 import type { ProfileRuntime, ProfileRuntimeFactory } from "./engine.js";
 import type { OperationName } from "./generated.js";
-import type { ProfileClientMap } from "./profile-clients.generated.js";
+import { PROFILE_OPERATIONS, type ProfileClientMap } from "./profile-clients.generated.js";
 import type { RequestOptions } from "./types.js";
 import { resolveArtifact, verifyArtifact, type ArtifactDescriptor, type ResolveOptions } from "./artifact-resolver.js";
 import { RUNTIME_CONFIG, type RuntimeProfileId } from "./runtime-manifest.generated.js";
@@ -35,7 +36,21 @@ async function createWorkerClient(options: WorkerProfileOptions): Promise<Worker
       })
     : await options.loadArtifact(url);
   await verifyArtifact(artifact, bytes);
-  return WorkerClient.create(options.createWorker, bytes);
+  const client = await WorkerClient.create(options.createWorker, bytes);
+  if (options.profile !== undefined) {
+    try {
+      const capabilities = await client.initialize();
+      assertOperationSet(
+        `isolated profile '${options.profile}'`,
+        PROFILE_OPERATIONS[options.profile],
+        capabilities.ops,
+      );
+    } catch (error) {
+      client.close();
+      throw error;
+    }
+  }
+  return client;
 }
 
 export function createWorkerProfileRuntime(options: WorkerProfileOptions): ProfileRuntimeFactory {

@@ -1,4 +1,5 @@
 import { BaseClient } from "./client.js";
+import { assertOperationSet } from "./capability-assertion.js";
 import { InProcessTransport } from "./in-process-transport.js";
 import { HISTORY_SUPPORT, OPERATIONS, type OperationName } from "./generated.js";
 import { resolveArtifact, type ResolveOptions } from "./artifact-resolver.js";
@@ -34,6 +35,7 @@ export class SharedClient extends BaseClient {
   readonly #operationSides: Readonly<Partial<Record<OperationName, string>>>;
   readonly #transport: InProcessTransport;
   #closed = false;
+  #capabilityError: unknown;
 
   private constructor(
     loader: SharedKernelLoader,
@@ -124,6 +126,7 @@ export class SharedClient extends BaseClient {
     options: RequestOptions = {},
   ): Promise<T> {
     if (this.#closed) throw new Error("SharedClient closed");
+    if (this.#capabilityError !== undefined) throw this.#capabilityError;
     await this.#ensureSides(operation, args);
     return this.#transport.request<T>(operation, args, options);
   }
@@ -154,14 +157,42 @@ export class SharedClient extends BaseClient {
     for (const sideName of this.#sideNamesFor(operation, args)) {
       const side = this.#sides.get(sideName);
       if (side === undefined) throw new Error(`shared side '${sideName}' is not configured`);
+      const wasLoaded = this.#loader.loadedSides.includes(sideName);
       await this.#loader.ensureSide(side, this.#buildFamily);
+      if (!wasLoaded) this.#assertLoadedCapabilities();
+    }
+  }
+
+  #declaredLoadedOperations(): OperationName[] {
+    const operations = [
+      ...RUNTIME_CONFIG.modules.semanticModules.runtime,
+      ...RUNTIME_CONFIG.modules.transferOperations,
+    ] as OperationName[];
+    const loadedSides = new Set(this.#loader.loadedSides);
+    for (const [operation, sideName] of Object.entries(this.#operationSides)) {
+      if (loadedSides.has(sideName)) operations.push(operation as OperationName);
+    }
+    return [...new Set(operations)].sort();
+  }
+
+  #rawCapabilities(): Capabilities {
+    return this.validateCapabilities(
+      this.#transport.call("capabilities", {}) as Capabilities,
+    );
+  }
+
+  #assertLoadedCapabilities(capabilities = this.#rawCapabilities()): void {
+    try {
+      assertOperationSet("shared runtime", this.#declaredLoadedOperations(), capabilities.ops);
+    } catch (error) {
+      this.#capabilityError = error;
+      throw error;
     }
   }
 
   override async initialize(): Promise<Capabilities> {
-    const capabilities = this.validateCapabilities(
-      this.#transport.call("capabilities", {}) as Capabilities,
-    );
+    const capabilities = this.#rawCapabilities();
+    this.#assertLoadedCapabilities(capabilities);
     const ops = [...new Set<OperationName>([
       ...capabilities.ops,
       ...Object.keys(this.#operationSides) as OperationName[],

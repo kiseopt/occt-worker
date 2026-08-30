@@ -2,13 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SharedClient } from "../../dist/shared-client.js";
 import { SharedKernelLoadError } from "../../dist/shared-loader.js";
+import { RUNTIME_CONFIG } from "../../dist/runtime-manifest.generated.js";
 
-function fakeMain({ family = "family-a", protocolVersion = "1.2.0", onLoad, onHandle } = {}) {
+const sharedMainOperations = [
+  ...RUNTIME_CONFIG.modules.semanticModules.runtime,
+  ...RUNTIME_CONFIG.modules.transferOperations,
+];
+
+function fakeMain({
+  family = "family-a",
+  protocolVersion = "1.2.0",
+  onLoad,
+  onHandle,
+  mainOperations = sharedMainOperations,
+  sideOperations = { "modeling.side.wasm": ["makeBox"] },
+} = {}) {
   const memory = new WebAssembly.Memory({ initial: 1 });
   const heap = new Uint8Array(memory.buffer);
   const responsePointer = 8192;
   let registrations = 0;
   let pluginName = "";
+  const registeredOperations = new Set(mainOperations);
   return {
     memory,
     HEAPU8: heap,
@@ -17,6 +31,7 @@ function fakeMain({ family = "family-a", protocolVersion = "1.2.0", onLoad, onHa
       onLoad?.(url);
       pluginName = url.replace(/\.side\.wasm$/, "");
       registrations++;
+      for (const operation of sideOperations[url] ?? []) registeredOperations.add(operation);
       return true;
     },
     _k_alloc: () => 1024,
@@ -31,8 +46,10 @@ function fakeMain({ family = "family-a", protocolVersion = "1.2.0", onLoad, onHa
             protocolVersion,
             kernelVersion: "main-kernel",
             occtVersion: "main-occt",
-            ops: ["capabilities", "beginScope"],
-            historySupport: { capabilities: "unsupported", beginScope: "unsupported" },
+            ops: [...registeredOperations],
+            historySupport: Object.fromEntries(
+              [...registeredOperations].map((operation) => [operation, "unsupported"]),
+            ),
             buildFlags: { wasmExceptions: true, source: "main" },
           }
         : {};
@@ -82,7 +99,7 @@ test("shared client derives capabilities from Main and validates its boundary", 
   assert.equal(capabilities.kernelVersion, "main-kernel");
   assert.equal(capabilities.occtVersion, "main-occt");
   assert.deepEqual(capabilities.buildFlags, { wasmExceptions: true, source: "main" });
-  assert.deepEqual(capabilities.ops, ["beginScope", "capabilities", "makeBox"]);
+  assert.deepEqual(capabilities.ops, [...new Set([...sharedMainOperations, "makeBox"])].sort());
   assert.equal(capabilities.historySupport.makeBox, "unsupported");
   await client.request("batch", {
     ops: [{ op: "batch", args: { ops: [{ op: "makeBox", args: {} }] } }],
@@ -107,6 +124,54 @@ test("shared client derives capabilities from Main and validates its boundary", 
     })),
     /maps to unconfigured side 'missing.side.wasm'/,
   );
+});
+
+test("shared client validates only the operations for sides loaded so far", async () => {
+  const baseOptions = options(fakeMain());
+  const algorithms = {
+    ...baseOptions.config.sides[0],
+    name: "algorithms.side.wasm",
+    url: "algorithms.side.wasm",
+  };
+  const module = fakeMain({
+    sideOperations: {
+      "modeling.side.wasm": ["makeBox"],
+      "algorithms.side.wasm": ["booleanFuse"],
+    },
+  });
+  const client = await SharedClient.create(options(module, {
+    config: {
+      ...baseOptions.config,
+      sides: [...baseOptions.config.sides, algorithms],
+      operationSides: {
+        makeBox: "modeling.side.wasm",
+        booleanFuse: "algorithms.side.wasm",
+      },
+    },
+  }));
+  try {
+    await client.request("makeBox", {});
+    await client.request("booleanFuse", {});
+  } finally {
+    client.close();
+  }
+});
+
+test("shared client reports missing and extra registered side operations", async () => {
+  const module = fakeMain({
+    sideOperations: { "modeling.side.wasm": ["fillet"] },
+  });
+  const client = await SharedClient.create(options(module));
+  try {
+    await assert.rejects(
+      client.request("makeBox", {}),
+      (error) => /declared but not registered: makeBox/.test(error.message)
+        && /registered but not declared: fillet/.test(error.message),
+    );
+    await assert.rejects(client.request("makeBox", {}), /capability mismatch/);
+  } finally {
+    client.close();
+  }
 });
 
 test("shared client connects RequestOptions cancellation and progress to Main imports", async () => {

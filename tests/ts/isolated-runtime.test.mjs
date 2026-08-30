@@ -4,7 +4,7 @@ import { Worker } from "node:worker_threads";
 import test from "node:test";
 import { GeometryEngine } from "../../dist/engine.js";
 import { createWorkerProfileRuntime } from "../../dist/isolated-runtime.js";
-import { RUNTIME_CONFIG } from "../../dist/index.js";
+import { PROFILE_OPERATIONS, RUNTIME_CONFIG } from "../../dist/index.js";
 
 function createNodeWorker() {
   const worker = new Worker(new URL("./node-worker.mjs", import.meta.url));
@@ -17,6 +17,65 @@ function createNodeWorker() {
     },
   };
 }
+
+function createCapabilityWorker(ops) {
+  const listeners = { message: [], error: [] };
+  let terminated = false;
+  const emit = (data) => {
+    for (const listener of listeners.message) listener({ data });
+  };
+  return {
+    postMessage: (message) => {
+      if (message.type === "init") {
+        queueMicrotask(() => emit({ type: "ready" }));
+        return;
+      }
+      if (message.op === "capabilities") {
+        queueMicrotask(() => emit({
+          type: "response",
+          id: message.id,
+          ok: true,
+          result: {
+            protocolVersion: "1.2.0",
+            kernelVersion: "test",
+            occtVersion: "test",
+            ops,
+            historySupport: Object.fromEntries(ops.map((operation) => [operation, "unsupported"])),
+            buildFlags: { threads: false, simd: false, wasmExceptions: true },
+          },
+        }));
+      }
+    },
+    terminate: () => { terminated = true; },
+    addEventListener: (type, listener) => { listeners[type].push(listener); },
+    get terminated() { return terminated; },
+  };
+}
+
+test("isolated profile initialization rejects both capability difference directions", async () => {
+  const bytes = await readFile(new URL("../../artifacts/preview.wasm", import.meta.url));
+  const operations = [
+    ...PROFILE_OPERATIONS.preview.filter((operation) => operation !== "bbox"),
+    "fillet",
+  ];
+  const workers = [];
+  const runtimeFactory = createWorkerProfileRuntime({
+    profile: "preview",
+    createWorker: () => {
+      const worker = createCapabilityWorker(operations);
+      workers.push(worker);
+      return worker;
+    },
+    loadArtifact: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  });
+
+  await assert.rejects(
+    runtimeFactory(),
+    (error) => /declared but not registered: bbox/.test(error.message)
+      && /registered but not declared: fillet/.test(error.message),
+  );
+  assert.equal(workers[0].terminated, true);
+});
 
 test("createWorkerProfileRuntime drives a real isolated profile worker", async () => {
   const profile = RUNTIME_CONFIG.profiles["core-modeling"];
