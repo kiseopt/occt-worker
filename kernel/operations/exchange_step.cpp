@@ -1,6 +1,6 @@
 // Focused CAD exchange handlers.
 
-#include "kernel_exchange_cad_operations.hpp"
+#include "kernel_step_shape_exchange_operations.hpp"
 #include "kernel_exchange_cad_helpers.hpp"
 #include "kernel_operation_context.hpp"
 #include "kernel_protocol_helpers.hpp"

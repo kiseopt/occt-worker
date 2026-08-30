@@ -375,9 +375,17 @@ inline constexpr std::array<const char*, 10> kExchangeMeshOperationNames = {
   OCCT_EXCHANGE_MESH_OPERATION_TABLE(OCCT_OPERATION_NAME)
 };
 #undef OCCT_OPERATION_NAME
-#define OCCT_EXCHANGE_CAD_OPERATION_TABLE(X) \
+#define OCCT_STEP_SHAPE_EXCHANGE_OPERATION_TABLE(X) \
   X(importSTEP) \
   X(exportSTEP) \
+  X(probeFormat)
+
+#define OCCT_OPERATION_NAME(theOperation) #theOperation,
+inline constexpr std::array<const char*, 3> kStepShapeExchangeOperationNames = {
+  OCCT_STEP_SHAPE_EXCHANGE_OPERATION_TABLE(OCCT_OPERATION_NAME)
+};
+#undef OCCT_OPERATION_NAME
+#define OCCT_CAD_DOCUMENT_EXCHANGE_OPERATION_TABLE(X) \
   X(importSTEPDocument) \
   X(exportSTEPDocument) \
   X(importIGES) \
@@ -385,12 +393,11 @@ inline constexpr std::array<const char*, 10> kExchangeMeshOperationNames = {
   X(importIGESDocument) \
   X(exportIGESDocument) \
   X(importXCAF) \
-  X(exportXCAF) \
-  X(probeFormat)
+  X(exportXCAF)
 
 #define OCCT_OPERATION_NAME(theOperation) #theOperation,
-inline constexpr std::array<const char*, 11> kExchangeCadOperationNames = {
-  OCCT_EXCHANGE_CAD_OPERATION_TABLE(OCCT_OPERATION_NAME)
+inline constexpr std::array<const char*, 8> kCadDocumentExchangeOperationNames = {
+  OCCT_CAD_DOCUMENT_EXCHANGE_OPERATION_TABLE(OCCT_OPERATION_NAME)
 };
 #undef OCCT_OPERATION_NAME
 struct OperationFailurePolicy { const char* operation; ErrorCode code; };

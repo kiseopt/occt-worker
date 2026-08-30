@@ -52,18 +52,20 @@ set(EXCHANGE_MESH_SOURCES
   operations/exchange_obj_ply_gltf.cpp
 )
 set(GROUP_SOURCES_exchange_mesh ${EXCHANGE_MESH_SOURCES})
-set(EXCHANGE_CAD_SOURCES
+set(GROUP_SOURCES_step_shape_exchange
   operations/exchange_cad.cpp
+  operations/exchange_step.cpp
+  operations/exchange_probe.cpp
+)
+set(GROUP_SOURCES_cad_document_exchange
+  operations/cad_document_exchange.cpp
   operations/exchange_document_export.cpp
   operations/exchange_document_writers.cpp
   operations/exchange_document_nodes.cpp
   operations/exchange_document_annotations.cpp
   operations/exchange_document_import.cpp
-  operations/exchange_probe.cpp
   operations/exchange_iges.cpp
-  operations/exchange_step.cpp
 )
-set(GROUP_SOURCES_exchange_cad ${EXCHANGE_CAD_SOURCES})
 
 set(OCCT_TOOLKITS
   TKBinXCAF TKXmlXCAF TKBin TKBinL TKXml TKXmlL
