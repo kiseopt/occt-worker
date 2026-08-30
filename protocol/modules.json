@@ -136,9 +136,9 @@
       "artifact": "exchange.wasm",
       "artifacts": ["step-shape-exchange.side.wasm", "cad-document-exchange.side.wasm", "exchange-mesh.side.wasm"]
     },
-    "step-preview": {
-      "artifact": "step-preview.wasm",
-      "artifacts": ["step-shape-exchange.side.wasm"]
+    "preview": {
+      "artifact": "preview.wasm",
+      "artifacts": ["topology-query.side.wasm", "tessellation.side.wasm", "step-shape-exchange.side.wasm"]
     },
     "modeling-viewer": {
       "artifact": "modeling-viewer.wasm",

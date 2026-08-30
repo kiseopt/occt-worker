@@ -101,7 +101,7 @@ RUN source "${EMSDK}/emsdk_env.sh" \
          -DKERNEL_BUILD_PROFILES=ON \
     && cmake --build build/release/profiles --parallel \
     && mkdir -p artifacts \
-    && for profile in core-modeling mesh exchange step-preview modeling-viewer full; do \
+    && for profile in core-modeling mesh exchange preview modeling-viewer full; do \
          wasm-opt "build/release/profiles/kernel/profile-${profile}.wasm" -O3 --all-features --converge \
            -o "artifacts/${profile}.wasm"; \
        done

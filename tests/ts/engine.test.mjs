@@ -69,12 +69,12 @@ test("lazy profiles, clone chain, source survival, and releaseShape cleanup", as
 
 test("capability routing rejects ineligible constructors and unknown operations", async () => {
   const engine = new GeometryEngine(modules);
-  engine.registerProfile("step-preview", "f", async () => ({ request: async () => ({}) }));
+  engine.registerProfile("preview", "f", async () => ({ request: async () => ({}) }));
   engine.registerProfile("mesh", "f", async () => ({ request: async () => ({}) }));
 
-  // step-preview maps to exchange-cad only: constructors are ineligible there.
+  // preview has query/tessellation/STEP exchange only: constructors are ineligible there.
   await assert.rejects(
-    engine.create("step-preview", "makeBox", { size: [1, 1, 1] }),
+    engine.create("preview", "makeBox", { size: [1, 1, 1] }),
     (error) => error instanceof EngineError && error.code === "UnsupportedCapability",
   );
   await assert.rejects(
@@ -90,7 +90,7 @@ test("capabilities is static and does not start registered profiles", async () =
     starts += 1;
     return { request: async () => ({}) };
   };
-  engine.registerProfile("step-preview", "f", factory);
+  engine.registerProfile("preview", "f", factory);
   engine.registerProfile("mesh", "f", factory);
   const before = engine.stats().startedProfiles;
   const capabilities = await engine.capabilities();
