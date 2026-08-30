@@ -252,22 +252,29 @@ inline constexpr std::array<const char*, 11> kRuntimeOperationNames = {
   X(makeSurfaceOffset) \
   X(makeSurfaceRevolution) \
   X(makeSurfaceRuled) \
+  X(inspectTolerances) \
+  X(setTolerance) \
+  X(isValid) \
+  X(diagnoseShape)
+
+#define OCCT_OPERATION_NAME(theOperation) #theOperation,
+inline constexpr std::array<const char*, 54> kGeometryTopologyOperationNames = {
+  OCCT_GEOMETRY_TOPOLOGY_OPERATION_TABLE(OCCT_OPERATION_NAME)
+};
+#undef OCCT_OPERATION_NAME
+#define OCCT_TOPOLOGY_QUERY_OPERATION_TABLE(X) \
   X(getSubShape) \
   X(getSubShapes) \
   X(shapeType) \
   X(topologyCounts) \
   X(getAdjacency) \
   X(isSameShape) \
-  X(inspectTolerances) \
-  X(setTolerance) \
-  X(isValid) \
-  X(diagnoseShape) \
   X(bbox) \
   X(obb)
 
 #define OCCT_OPERATION_NAME(theOperation) #theOperation,
-inline constexpr std::array<const char*, 62> kGeometryTopologyOperationNames = {
-  OCCT_GEOMETRY_TOPOLOGY_OPERATION_TABLE(OCCT_OPERATION_NAME)
+inline constexpr std::array<const char*, 8> kTopologyQueryOperationNames = {
+  OCCT_TOPOLOGY_QUERY_OPERATION_TABLE(OCCT_OPERATION_NAME)
 };
 #undef OCCT_OPERATION_NAME
 #define OCCT_MODELING_OPERATION_TABLE(X) \

@@ -2,29 +2,27 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { RUNTIME_CONFIG } from "../../dist/index.js";
 
 const root = new URL("../..", import.meta.url);
 const artifactPath = (name) => new URL(`../../artifacts/${name}`, import.meta.url);
 
-test("shared Main loads all six Sides and runs a modeling smoke", async () => {
+test("shared Main loads all configured Sides and runs a modeling smoke", async () => {
   const { default: createMain } = await import(artifactPath("shared-main.mjs"));
   const repoPath = fileURLToPath(root);
   const module = await createMain({ locateFile: (path) => join(repoPath, "artifacts", path) });
-  const sides = [
-    "geometry-topology.side.wasm",
-    "modeling.side.wasm",
-    "algorithms.side.wasm",
-    "mesh.side.wasm",
-    "exchange-mesh.side.wasm",
-    "exchange-cad.side.wasm",
-  ];
+  const sides = RUNTIME_CONFIG.shared.sides.map((side) => side.name);
   for (const side of sides) {
     assert.equal(await module.loadDynamicLibrary(side, { loadAsync: true, global: true, nodelete: true }), true);
   }
   assert.equal(module.UTF8ToString(module._occt_host_build_family()), "occt-worker-shared-v1");
-  assert.equal(module._occt_host_plugin_count(), 6);
+  const pluginCount = RUNTIME_CONFIG.shared.sides.reduce((count, side) => count + side.semanticModules.length, 0);
+  assert.equal(module._occt_host_plugin_count(), pluginCount);
   assert.equal(module._occt_host_plugin_error(), 0);
-  assert.equal(module.UTF8ToString(module._occt_host_plugin_name()), "exchange-cad");
+  assert.equal(
+    module.UTF8ToString(module._occt_host_plugin_name()),
+    RUNTIME_CONFIG.shared.sides.at(-1).semanticModules.at(-1),
+  );
 
   let nextId = 1;
   const call = (op, args = {}) => {

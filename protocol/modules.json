@@ -70,8 +70,11 @@
       "makeVertex", "makeWire", "makePolygon", "makeFace", "makeFaceOnSurface",
       "makeSurfaceBezier", "makeSurfaceBSpline", "makeSurfaceExtrusion", "makeSurfaceFace",
       "makeSurfaceFilling", "makeSurfaceOffset", "makeSurfaceRevolution", "makeSurfaceRuled",
-      "getSubShape", "getSubShapes", "shapeType", "topologyCounts", "getAdjacency", "isSameShape",
-      "inspectTolerances", "setTolerance", "isValid", "diagnoseShape", "bbox", "obb"
+      "inspectTolerances", "setTolerance", "isValid", "diagnoseShape"
+    ],
+    "topology-query": [
+      "getSubShape", "getSubShapes", "shapeType", "topologyCounts",
+      "getAdjacency", "isSameShape", "bbox", "obb"
     ],
     "modeling": [
       "makeBox", "makeCone", "makeCylinder", "makeSphere", "makeTorus", "makeWedge",
@@ -109,6 +112,7 @@
   },
   "artifactModuleCandidates": {
     "geometry-topology.side.wasm": ["geometry-topology"],
+    "topology-query.side.wasm": ["topology-query"],
     "modeling.side.wasm": ["modeling"],
     "algorithms.side.wasm": ["algorithms"],
     "mesh.side.wasm": ["mesh"],
@@ -119,11 +123,11 @@
   "profiles": {
     "core-modeling": {
       "artifact": "core-modeling.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "modeling.side.wasm", "algorithms.side.wasm"]
+      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm"]
     },
     "mesh": {
       "artifact": "mesh.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm"]
+      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm"]
     },
     "exchange": {
       "artifact": "exchange.wasm",
@@ -135,11 +139,11 @@
     },
     "modeling-viewer": {
       "artifact": "modeling-viewer.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm"]
+      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm"]
     },
     "full-profile": {
       "artifact": "full.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm", "exchange-mesh.side.wasm", "step-shape-exchange.side.wasm", "cad-document-exchange.side.wasm"]
+      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm", "exchange-mesh.side.wasm", "step-shape-exchange.side.wasm", "cad-document-exchange.side.wasm"]
     }
   }
 }

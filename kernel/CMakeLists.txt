@@ -38,6 +38,7 @@ set(GEOMETRY_TOPOLOGY_SOURCES
   operations/geometry_analysis.cpp
 )
 set(GROUP_SOURCES_geometry_topology ${GEOMETRY_TOPOLOGY_SOURCES})
+set(GROUP_SOURCES_topology_query operations/topology_query.cpp)
 set(MODELING_SOURCES operations/modeling.cpp operations/modeling_fillet.cpp operations/modeling_transform.cpp)
 set(GROUP_SOURCES_modeling ${MODELING_SOURCES})
 set(ALGORITHMS_SOURCES

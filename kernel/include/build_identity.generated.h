@@ -10,6 +10,8 @@
 #define OCCT_BUILD_WASM_EXCEPTIONS 1
 #define OCCT_SIDE_NAME_geometry_topology "geometry-topology"
 #define OCCT_SIDE_SEMANTIC_MODULE_geometry_topology "geometry-topology"
+#define OCCT_SIDE_NAME_topology_query "topology-query"
+#define OCCT_SIDE_SEMANTIC_MODULE_topology_query "topology-query"
 #define OCCT_SIDE_NAME_modeling "modeling"
 #define OCCT_SIDE_SEMANTIC_MODULE_modeling "modeling"
 #define OCCT_SIDE_NAME_algorithms "algorithms"
