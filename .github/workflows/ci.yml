@@ -195,10 +195,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Downloaded explicitly rather than with merge-multiple: upload-artifact roots each
+      # archive at the least common ancestor of its paths, so release-path keeps its
+      # wasm//artifacts//docs/ prefixes while shared-path (a single artifacts/ path) is
+      # rooted inside artifacts/ and must be unpacked back into it.
       - uses: actions/download-artifact@v6
         with:
-          pattern: "*-path"
-          merge-multiple: true
+          name: release-path
+      - uses: actions/download-artifact@v6
+        with:
+          name: shared-path
+          path: artifacts
       - run: npm test
       - name: Verify source-generated files
         run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
@@ -236,6 +243,10 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: release-path
+      # tests/browser/*.mjs import ../../dist/index.js and dist/worker-entry.js, and
+      # test:browser does not build. In the old single-job workflow npm test had already
+      # produced dist/ earlier in the same job; this job has to build it itself.
+      - run: npm run build
       - run: npx playwright install ${{ matrix.browser }}
       - run: npm run test:browser -- --browser=${{ matrix.browser }}
 
@@ -257,10 +268,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Same explicit unpacking as the verify job; the debug artifact is deliberately not
+      # downloaded, since debug is a test artifact and never a release asset.
       - uses: actions/download-artifact@v6
         with:
-          pattern: "*-path"
-          merge-multiple: true
+          name: release-path
+      - uses: actions/download-artifact@v6
+        with:
+          name: shared-path
+          path: artifacts
       - name: Write final release URLs
         shell: pwsh
         run: |
