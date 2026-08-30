@@ -43,7 +43,7 @@ const expectedArtifacts = new Map([
     name,
     { kind: "shared-side", buildFamily: manifest.buildFamilies?.shared, semanticModules },
   ]),
-  ...Object.entries(modules.profiles ?? {}).map(([profile, definition]) => [
+  ...Object.entries(modules.profiles ?? {}).filter(([, definition]) => definition.aliasOf === undefined).map(([profile, definition]) => [
     definition.artifact,
     { kind: "isolated-profile", buildFamily: manifest.buildFamilies?.isolated, profile },
   ]),

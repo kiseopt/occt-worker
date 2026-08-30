@@ -89,13 +89,21 @@ const artifactDescriptors = Object.fromEntries(Object.entries(artifacts.artifact
   name,
   { name, ...descriptor },
 ]));
+const resolvedProfiles = Object.fromEntries(Object.entries(modules.profiles).map(([profileId, profile]) => {
+  if (profile.aliasOf === undefined) return [profileId, profile];
+  const target = modules.profiles[profile.aliasOf];
+  if (target === undefined || target.aliasOf !== undefined) {
+    throw new Error(`profile '${profileId}' has an invalid alias target '${profile.aliasOf}'`);
+  }
+  return [profileId, target];
+}));
 const operationSides = Object.fromEntries(Object.entries(modules.artifactModuleCandidates).flatMap(([artifact, semanticModules]) => (
   semanticModules.flatMap((moduleName) => (
     (modules.semanticModules[moduleName] ?? []).map((operation) => [operation, artifact])
   ))
 )));
 const sharedSides = Object.keys(modules.artifactModuleCandidates).map((name) => artifactDescriptors[name]);
-const profileConfigs = Object.fromEntries(Object.entries(modules.profiles).map(([profileId, profile]) => {
+const profileConfigs = Object.fromEntries(Object.entries(resolvedProfiles).map(([profileId, profile]) => {
   const artifact = artifactDescriptors[profile.artifact];
   if (artifact === undefined) throw new Error(`profile '${profileId}' references unknown artifact '${profile.artifact}'`);
   return [profileId, {
@@ -307,7 +315,7 @@ await writeFile(
     modules: {
       semanticModules: modules.semanticModules,
       artifactModuleCandidates: modules.artifactModuleCandidates,
-      profiles: modules.profiles,
+      profiles: resolvedProfiles,
       transferOperations: modules.transferOperations ?? [],
     },
     shared: {

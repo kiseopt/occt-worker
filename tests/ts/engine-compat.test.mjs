@@ -9,12 +9,13 @@ import { GeometryEngine } from "../../dist/engine.js";
 import { ParametricModel } from "../../dist/parametric.js";
 import { Worker } from "node:worker_threads";
 import { createWorkerProfileRuntime } from "../../dist/isolated-runtime.js";
+import { RUNTIME_CONFIG } from "../../dist/index.js";
 import {
   EngineCompatClient,
 } from "../../dist/engine-compat.js";
 
 const wasm = await readFile(new URL("../../wasm/occt-worker.wasm", import.meta.url));
-const modules = JSON.parse(await readFile(new URL("../../protocol/modules.json", import.meta.url), "utf8"));
+const modules = RUNTIME_CONFIG.modules;
 const artifacts = JSON.parse(await readFile(new URL("../../protocol/artifacts.json", import.meta.url), "utf8"));
 
 function createNodeWorker() {

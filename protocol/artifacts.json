@@ -164,14 +164,6 @@
       "sha256": "405f8fa3a0e01f07bf63437b5636228daa4769ca1201b78d26ebae21d2a81e6c",
       "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/preview.wasm"
     },
-    "modeling-viewer.wasm": {
-      "kind": "isolated-profile",
-      "profile": "modeling-viewer",
-      "buildFamily": "occt-worker-profile-v1",
-      "sizeBytes": 18722873,
-      "sha256": "bfba1716212ac35fe0c53583158306fabb528f400ccb3c9815c5bce5de34625d",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.2.0/modeling-viewer.wasm"
-    },
     "full.wasm": {
       "kind": "isolated-profile",
       "profile": "full-profile",

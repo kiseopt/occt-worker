@@ -14,9 +14,10 @@ import {
   TRANSFER_MAGIC,
   TRANSFER_VERSION,
 } from "../../dist/engine.js";
+import { RUNTIME_CONFIG } from "../../dist/index.js";
 
 const wasm = await readFile(new URL("../../wasm/occt-worker.wasm", import.meta.url));
-const modules = JSON.parse(await readFile(new URL("../../protocol/modules.json", import.meta.url), "utf8"));
+const modules = RUNTIME_CONFIG.modules;
 
 function realRuntime(calls) {
   return async () => {
@@ -81,6 +82,18 @@ test("capability routing rejects ineligible constructors and unknown operations"
     engine.request("timeTravel", {}),
     (error) => error instanceof EngineError && error.code === "UnsupportedCapability",
   );
+});
+
+test("modeling-viewer alias has the same operation eligibility as mesh", () => {
+  const engine = new GeometryEngine(modules);
+  const operations = Object.values(modules.semanticModules).flat();
+  for (const operation of operations) {
+    assert.equal(
+      engine.eligibleProfiles(operation).includes("modeling-viewer"),
+      engine.eligibleProfiles(operation).includes("mesh"),
+      operation,
+    );
+  }
 });
 
 test("capabilities is static and does not start registered profiles", async () => {

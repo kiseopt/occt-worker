@@ -104,10 +104,24 @@ check(Object.keys(profiles).length > 0, "profiles must not be empty");
 const profileOps = {};
 const profileArtifacts = new Set();
 for (const [profileId, profile] of Object.entries(profiles)) {
-  check(typeof profile.artifact === "string" && profile.artifact.endsWith(".wasm"), `profile '${profileId}' must name its standalone artifact`);
-  check(!profileArtifacts.has(profile.artifact), `standalone artifact '${profile.artifact}' is assigned to more than one profile`);
-  profileArtifacts.add(profile.artifact);
-  const artifacts = profile.artifacts ?? [];
+  const aliasTarget = profile.aliasOf;
+  if (aliasTarget !== undefined) {
+    check(typeof aliasTarget === "string" && profiles[aliasTarget] !== undefined,
+      `profile '${profileId}' aliases unknown profile '${aliasTarget}'`);
+    check(profile.artifact === undefined && profile.artifacts === undefined && profile.units === undefined,
+      `profile alias '${profileId}' must not define artifact, artifacts, or units`);
+    check(profiles[aliasTarget]?.aliasOf === undefined,
+      `profile alias '${profileId}' must not point to another alias`);
+  }
+  const resolved = typeof aliasTarget === "string" && profiles[aliasTarget] !== undefined
+    ? profiles[aliasTarget]
+    : profile;
+  if (aliasTarget === undefined) {
+    check(typeof resolved.artifact === "string" && resolved.artifact.endsWith(".wasm"), `profile '${profileId}' must name its standalone artifact`);
+    check(!profileArtifacts.has(resolved.artifact), `standalone artifact '${resolved.artifact}' is assigned to more than one profile`);
+    profileArtifacts.add(resolved.artifact);
+  }
+  const artifacts = resolved.artifacts ?? [];
   check(Array.isArray(artifacts) && artifacts.length > 0, `profile '${profileId}' must list at least one artifact`);
   const seenArtifacts = new Set();
   const derived = new Set();

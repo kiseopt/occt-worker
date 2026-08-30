@@ -41,6 +41,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 $modules = Get-Content -Raw (Join-Path $repo 'protocol/modules.json') | ConvertFrom-Json
 foreach ($profile in $modules.profiles.PSObject.Properties) {
+  if ($null -ne $profile.Value.aliasOf) { continue }
   $source = Join-Path $profileBuild "kernel/profile-$($profile.Name).wasm"
   $target = Join-Path $artifactDir $profile.Value.artifact
   if ($Configuration -eq 'Release') {

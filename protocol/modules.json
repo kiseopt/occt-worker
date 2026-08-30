@@ -140,10 +140,7 @@
       "artifact": "preview.wasm",
       "artifacts": ["topology-query.side.wasm", "tessellation.side.wasm", "step-shape-exchange.side.wasm"]
     },
-    "modeling-viewer": {
-      "artifact": "modeling-viewer.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "tessellation.side.wasm", "mesh.side.wasm"]
-    },
+    "modeling-viewer": { "aliasOf": "mesh" },
     "full-profile": {
       "artifact": "full.wasm",
       "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "tessellation.side.wasm", "mesh.side.wasm", "exchange-mesh.side.wasm", "step-shape-exchange.side.wasm", "cad-document-exchange.side.wasm"]

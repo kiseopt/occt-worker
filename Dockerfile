@@ -101,9 +101,10 @@ RUN source "${EMSDK}/emsdk_env.sh" \
          -DKERNEL_BUILD_PROFILES=ON \
     && cmake --build build/release/profiles --parallel \
     && mkdir -p artifacts \
-    && for profile in core-modeling mesh exchange preview modeling-viewer full; do \
+    && node -e 'const profiles = require("./protocol/modules.json").profiles; for (const [id, profile] of Object.entries(profiles)) if (profile.aliasOf === undefined) console.log(`${id}\t${profile.artifact}`)' \
+       | while IFS=$'\t' read -r profile artifact; do \
          wasm-opt "build/release/profiles/kernel/profile-${profile}.wasm" -O3 --all-features --converge \
-           -o "artifacts/${profile}.wasm"; \
+           -o "artifacts/${artifact}"; \
        done
 
 FROM full AS shared

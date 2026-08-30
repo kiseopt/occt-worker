@@ -39,6 +39,31 @@ test("createWorkerProfileRuntime drives a real isolated profile worker", async (
   }
 });
 
+test("modeling-viewer profile loads and runs the mesh artifact", async () => {
+  const profile = RUNTIME_CONFIG.profiles["modeling-viewer"];
+  let loadedArtifact;
+  const runtimeFactory = createWorkerProfileRuntime({
+    profile: "modeling-viewer",
+    createWorker: createNodeWorker,
+    loadArtifact: (url) => {
+      loadedArtifact = url;
+      return readFile(new URL("../../artifacts/mesh.wasm", import.meta.url))
+        .then((bytes) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    },
+  });
+  const engine = new GeometryEngine(RUNTIME_CONFIG.modules);
+  engine.registerProfile(profile.profileId, profile.buildFamily, runtimeFactory);
+
+  try {
+    const box = await engine.create("modeling-viewer", "makeBox", { size: [2, 3, 4] });
+    assert.deepEqual((await engine.request("bbox", { shape: box })).max.map(Math.round), [2, 3, 4]);
+    assert.match(loadedArtifact, /mesh\.wasm$/);
+    assert.equal(profile.artifact.name, "mesh.wasm");
+  } finally {
+    await engine.close();
+  }
+});
+
 test("real isolated profile workers support clone transfer and source survival", async () => {
   const engine = new GeometryEngine();
   const register = (profileId) => {
