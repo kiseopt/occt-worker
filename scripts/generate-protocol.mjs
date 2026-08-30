@@ -322,7 +322,7 @@ await writeFile(
 
 await writeFile(
   new URL("../kernel/include/build_identity.generated.h", import.meta.url),
-  `// Generated from protocol/modules.json and protocol/artifacts.json. Do not edit.\n#pragma once\n\n#define OCCT_PLUGIN_ABI_VERSION_V1 ${artifacts.pluginAbiVersion}u\n#define OCCT_SHARED_BUILD_FAMILY "${artifacts.buildFamilies.shared}"\n#define OCCT_SHARED_OCCT_VERSION "${occtSource.version}"\n#define OCCT_SHARED_EMSDK_VERSION "${emsdkSource.version}"\n${cppSideIdentities}\n`,
+  `// Generated from protocol/artifacts.json and protocol/build-flags.json. Do not edit.\n#pragma once\n\n#define OCCT_PLUGIN_ABI_VERSION_V1 ${artifacts.pluginAbiVersion}u\n#define OCCT_SHARED_BUILD_FAMILY "${artifacts.buildFamilies.shared}"\n#define OCCT_SHARED_OCCT_VERSION "${occtSource.version}"\n#define OCCT_SHARED_EMSDK_VERSION "${emsdkSource.version}"\n#define OCCT_BUILD_THREADS ${buildFlags.threads ? 1 : 0}\n#define OCCT_BUILD_SIMD ${buildFlags.simd ? 1 : 0}\n#define OCCT_BUILD_WASM_EXCEPTIONS ${buildFlags.wasmExceptions ? 1 : 0}\n${cppSideIdentities}\n`,
 );
 
 await writeFile(

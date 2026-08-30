@@ -28,7 +28,9 @@ json h_capabilities(KernelOperationContext& theContext, const json& theArgs)
               {"occtVersion", OCCT_SHARED_OCCT_VERSION},
               {"ops", anOperations},
               {"historySupport", aHistorySupport},
-              {"buildFlags", {{"threads", false}, {"simd", false}, {"wasmExceptions", true}}}};
+              {"buildFlags", {{"threads", OCCT_BUILD_THREADS != 0},
+                               {"simd", OCCT_BUILD_SIMD != 0},
+                               {"wasmExceptions", OCCT_BUILD_WASM_EXCEPTIONS != 0}}}};
     }
 
 json h_beginScope(KernelOperationContext& theContext, const json& theArgs)
