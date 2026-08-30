@@ -30,6 +30,7 @@ function(standalone_kernel_target theTarget theSourcesVariable theToolkitsVariab
     --no-entry
     -fwasm-exceptions
     -ffp-contract=off
+    "-Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/${theTarget}.map"
     -sSTANDALONE_WASM
     -sALLOW_MEMORY_GROWTH=1
     -sMAXIMUM_MEMORY=2147483648

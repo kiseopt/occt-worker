@@ -41,6 +41,11 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & cmake --build $profileBuild --parallel
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+$previewMap = Join-Path $profileBuild 'kernel/profile-preview.map'
+$previewSizeReport = Join-Path $profileBuild 'kernel/profile-preview.occt-sizes.md'
+& node (Join-Path $repo 'scripts/report-occt-link-map.mjs') $previewMap --output $previewSizeReport
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 $topology = Get-Content -Raw (Join-Path $repo 'scripts/profile-topology.generated.json') | ConvertFrom-Json
 foreach ($profile in $topology.buildProfiles) {
