@@ -60,14 +60,15 @@ if ($PSBoundParameters.ContainsKey('MaxMemory')) {
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $topology = Get-Content -Raw (Join-Path $repo 'scripts/profile-topology.generated.json') | ConvertFrom-Json
-$selectedProfiles = if ($Profiles.Count -eq 0) {
+$requestedProfiles = @($Profiles | ForEach-Object { $_ -split ',' } | Where-Object { $_ -ne '' })
+$selectedProfiles = if ($requestedProfiles.Count -eq 0) {
   @($topology.buildProfiles)
 } else {
-  $unknownProfiles = @($Profiles | Where-Object { $_ -notin $topology.buildProfiles.id })
+  $unknownProfiles = @($requestedProfiles | Where-Object { $_ -notin $topology.buildProfiles.id })
   if ($unknownProfiles.Count -ne 0) {
     throw "Unknown build profile(s): $($unknownProfiles -join ', ')"
   }
-  @($topology.buildProfiles | Where-Object { $_.id -in $Profiles })
+  @($topology.buildProfiles | Where-Object { $_.id -in $requestedProfiles })
 }
 $targets = @($selectedProfiles | ForEach-Object { $_.target })
 & cmake --build $profileBuild --parallel --target @targets
