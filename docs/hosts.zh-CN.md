@@ -38,4 +38,6 @@ smoke 会预加载确定性的 `env` stub，使用 Wasmtime 提供 WASI Preview 
 
 `WorkerClient.request()` 支持 `{ signal, onProgress }`。排队请求可以直接移除；支持进度检查点的 STEP/IGES、VRML、网格和网格化操作使用一字 `SharedArrayBuffer` 协作取消，并保留 worker 和现有句柄。其他正在执行的同步操作采用终止并重建 worker 的硬取消，旧句柄同时失效。
 
+Dedicated Worker 隔离让主页面能够报告 `abort()`、`RangeError` 等 JavaScript 可见的软失败，但不能保护 iOS 页面免受内存不足终止：WebKit 的 Worker 与页面运行在同一个 WebContent 进程内，Jetsam 会终止整个进程。页面重新载入后，未完成尝试标记只能说明上次尝试没有完成，不能证明具体原因。
+
 共享输入不会 detach，`requestShared()` 可把输出物化为 `SharedArrayBuffer`。即使使用共享内存，wasm 线性内存到宿主共享缓冲之间仍有一次必要复制。浏览器使用这些能力需要 cross-origin isolation。

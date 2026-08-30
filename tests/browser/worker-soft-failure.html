@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Worker soft failure test</title>
+  </head>
+  <body>
+    <main>
+      <pre id="failure" data-state="running">Running</pre>
+      <button id="ui-probe" type="button">Check main thread</button>
+      <output id="ui-result">waiting</output>
+    </main>
+    <script type="module" src="./worker-soft-failure.mjs"></script>
+  </body>
+</html>

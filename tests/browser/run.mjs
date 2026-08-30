@@ -42,7 +42,18 @@ try {
   assert.equal(value.sharedTransport, true);
   assert.equal(value.stats.liveShapeHandles, 0);
   assert.equal(value.stats.liveBufferBytes, 0);
-  console.log(JSON.stringify({ browser: browserName, triangles: value.triangles }));
+
+  const failurePage = await browser.newPage();
+  await failurePage.goto(`http://127.0.0.1:${address.port}/tests/browser/worker-soft-failure.html`);
+  const failure = failurePage.locator("#failure");
+  await failure.waitFor({ state: "visible" });
+  await failurePage.waitForFunction(() => document.querySelector("#failure")?.dataset.state !== "running");
+  assert.equal(await failure.getAttribute("data-state"), "passed", await failure.textContent());
+  assert.match(await failure.textContent(), /Worker memory limit reached/);
+  await failurePage.locator("#ui-probe").click();
+  assert.equal(await failurePage.locator("#ui-result").textContent(), "alive");
+
+  console.log(JSON.stringify({ browser: browserName, triangles: value.triangles, workerSoftFailure: true }));
 } finally {
   await browser.close();
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
