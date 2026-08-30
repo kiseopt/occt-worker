@@ -1,14 +1,14 @@
 <!-- Generated from protocol/modules.json. Do not edit. -->
 
-# Profile capabilities
+# Profile capabilities / Profile 能力
 
-[中文说明 / Chinese translation](profile-capabilities.generated.zh-CN.md)
+[English reference / 英文规范](profile-capabilities.generated.md)
 
-Compile-time capability narrowing applies only to the official profiles below. A custom wasm artifact supplied through the LGPL replacement path can differ from these types, so custom artifacts must be checked with runtime `capabilities()`.
+编译期能力收窄只适用于下表由官方定义的 profile。通过 LGPL 替换路径提供的自定义 wasm 产物可能具有不同能力，因此必须用运行时 capabilities() 检查自定义产物。
 
-Type narrowing does not remove methods from the underlying runtime object. Code that bypasses TypeScript can still attempt unsupported calls; the kernel capability check remains the runtime enforcement boundary.
+类型收窄不会从底层运行时对象移除方法。绕过 TypeScript 的代码仍可能尝试不支持的调用；内核能力检查仍是运行时的强制边界。
 
-| Profile | Artifact | Alias of | Semantic modules | Operations |
+| Profile / Profile | Artifact / 产物 | Alias of / 别名 | Semantic modules / 语义模块 | Operations / 操作 |
 | --- | --- | --- | --- | ---: |
 | `core-modeling` | `core-modeling.wasm` | - | `geometry-topology`, `topology-query`, `modeling`, `algorithms` | 134 |
 | `mesh` | `mesh.wasm` | - | `geometry-topology`, `topology-query`, `modeling`, `algorithms`, `tessellation`, `mesh` | 140 |

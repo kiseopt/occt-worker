@@ -136,7 +136,7 @@
       th { width: 68%; color: #4b5965; font-weight: 600; }
       td { color: #17212b; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-      .long-run-test, .limit-test, .report-area {
+      .long-run-test, .limit-test, .pressure-test, .report-area {
         padding-top: 24px;
         border-top: 1px solid #cbd3da;
       }
@@ -149,7 +149,7 @@
         margin-top: 16px;
       }
 
-      #long-run-status, #limit-status {
+      #long-run-status, #limit-status, #pressure-status {
         min-height: 44px;
         margin-top: 12px;
         padding: 11px 12px;
@@ -159,11 +159,11 @@
         white-space: pre-wrap;
       }
 
-      #long-run-status[data-state="running"], #limit-status[data-state="running"] { border-color: #a86c00; background: #fff2cc; }
-      #long-run-status[data-state="complete"], #limit-status[data-state="complete"] { border-color: #247648; background: #dff3e8; }
-      #long-run-status[data-state="error"], #limit-status[data-state="error"] { border-color: #b3261e; background: #fde7e5; color: #7b1712; }
+      #long-run-status[data-state="running"], #limit-status[data-state="running"], #pressure-status[data-state="running"] { border-color: #a86c00; background: #fff2cc; }
+      #long-run-status[data-state="complete"], #limit-status[data-state="complete"], #pressure-status[data-state="complete"] { border-color: #247648; background: #dff3e8; }
+      #long-run-status[data-state="error"], #limit-status[data-state="error"], #pressure-status[data-state="error"] { border-color: #b3261e; background: #fde7e5; color: #7b1712; }
 
-      #long-run-report, #limit-report {
+      #long-run-report, #limit-report, #pressure-report {
         min-height: 122px;
         margin: 12px 0 24px;
         padding: 14px;
@@ -174,6 +174,18 @@
         font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
         white-space: pre-wrap;
         word-break: break-word;
+      }
+
+      .pressure-note {
+        margin-top: 12px;
+        color: #7b1712;
+        font-size: 13px;
+      }
+
+      .measurement-note {
+        margin-top: 12px;
+        color: #54616d;
+        font-size: 13px;
       }
 
       .report-actions {
@@ -252,6 +264,16 @@
           <label>
             候选产物
             <select id="limit-candidate">
+              <option value="preview:4096">preview / 4096 MiB</option>
+              <option value="full:4096">full / 4096 MiB</option>
+              <option value="preview:3072">preview / 3072 MiB</option>
+              <option value="full:3072">full / 3072 MiB</option>
+              <option value="preview:2560">preview / 2560 MiB</option>
+              <option value="full:2560">full / 2560 MiB</option>
+              <option value="preview:2048">preview / 2048 MiB</option>
+              <option value="full:2048">full / 2048 MiB</option>
+              <option value="preview:1792">preview / 1792 MiB</option>
+              <option value="full:1792">full / 1792 MiB</option>
               <option value="preview:1536">preview / 1536 MiB</option>
               <option value="full:1536">full / 1536 MiB</option>
               <option value="preview:1280">preview / 1280 MiB</option>
@@ -264,12 +286,43 @@
           </label>
           <button id="run-limit-test" type="button">开始二分测试</button>
         </div>
+        <p class="measurement-note">此项测的是 wasm 线性内存容量。容量达到 4096 MiB 时是 wasm32 地址空间上限；它不是设备物理内存读数。</p>
         <p id="limit-status" data-state="idle">等待测试</p>
         <div class="report-actions">
           <h2>二分结果</h2>
           <button id="copy-limit-results" type="button" class="secondary" disabled>复制二分结果</button>
         </div>
         <pre id="limit-report">测试完成或页面恢复后生成</pre>
+      </section>
+
+      <section class="pressure-test" aria-labelledby="pressure-title">
+        <div class="report-actions">
+          <h2 id="pressure-title">进程压力测试</h2>
+          <button id="run-pressure-test" type="button">开始压力测试</button>
+        </div>
+        <p class="pressure-note">此项会实际写入最多 7168 MiB 的额外内存，可能导致网页重载；请只在专门的测试设备上运行。</p>
+        <p id="pressure-status" data-state="idle">full 典型负载后分配并触碰额外缓冲区</p>
+        <div class="limit-controls">
+          <label>
+            额外压力目标
+            <select id="pressure-candidate">
+              <option value="7168">full + 7168 MiB</option>
+              <option value="6144">full + 6144 MiB</option>
+              <option value="5120">full + 5120 MiB</option>
+              <option value="4096">full + 4096 MiB</option>
+              <option value="3072">full + 3072 MiB</option>
+              <option value="2560">full + 2560 MiB</option>
+              <option value="2048">full + 2048 MiB</option>
+              <option value="1536">full + 1536 MiB</option>
+              <option value="1024">full + 1024 MiB</option>
+            </select>
+          </label>
+        </div>
+        <div class="report-actions">
+          <h2>压力结果</h2>
+          <button id="copy-pressure-results" type="button" class="secondary" disabled>复制压力结果</button>
+        </div>
+        <pre id="pressure-report">测试完成或页面恢复后生成</pre>
       </section>
 
       <section class="report-area" aria-labelledby="report-title">

@@ -1,15 +1,82 @@
 const MEBIBYTE = 1024 * 1024;
+const WASM_PAGE_BYTES = 64 * 1024;
+const WASM32_MAX_PAGES = 65536;
+const WASM32_MAX_MIB = WASM32_MAX_PAGES * WASM_PAGE_BYTES / MEBIBYTE;
+const TOUCH_STRIDE_BYTES = 4096;
+const PRESSURE_CHUNK_BYTES = 64 * MEBIBYTE;
+const PRESSURE_CANDIDATES = [7168, 6144, 5120, 4096, 3072, 2560, 2048, 1536, 1024];
+
+async function runPressureTest(memory, call, scopeId, pressureMb) {
+  call("endScope", { scopeId });
+  const targetBytes = pressureMb * MEBIBYTE;
+  const wasmCapacityMb = memory.buffer.byteLength / MEBIBYTE;
+  const chunks = [];
+  let allocatedBytes = 0;
+  let touchChecksum = 0;
+  while (allocatedBytes < targetBytes) {
+    const chunkBytes = Math.min(PRESSURE_CHUNK_BYTES, targetBytes - allocatedBytes);
+    try {
+      const chunk = new Uint8Array(chunkBytes);
+      chunk.fill((chunks.length * 29 + 0xa5) & 0xff);
+      for (let offset = 0; offset < chunk.byteLength; offset += TOUCH_STRIDE_BYTES) {
+        touchChecksum = (touchChecksum + chunk[offset]) >>> 0;
+      }
+      chunks.push(chunk);
+      allocatedBytes += chunkBytes;
+    } catch (error) {
+      self.postMessage({
+        type: "pressure-result",
+        result: {
+          outcome: "allocation-error",
+          targetMb: pressureMb,
+          wasmCapacityMb,
+          allocatedMb: allocatedBytes / MEBIBYTE,
+          touchChecksum,
+          detail: `${error.name}: ${error.message}`,
+        },
+      });
+      return;
+    }
+    self.postMessage({
+      type: "pressure-progress",
+      attemptStage: "allocating",
+      allocatedMb: allocatedBytes / MEBIBYTE,
+      touchChecksum,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  self.postMessage({
+    type: "pressure-result",
+    result: {
+      outcome: "pressure-complete",
+      targetMb: pressureMb,
+      wasmCapacityMb,
+      allocatedMb: allocatedBytes / MEBIBYTE,
+      touchChecksum,
+    },
+  });
+}
 
 self.addEventListener("message", async (event) => {
   try {
-    const { mode = "measure", profile, candidateMb } = event.data;
-    if (profile !== "preview" && profile !== "full") throw new Error(`Unknown profile '${profile}'`);
-    if (!["measure", "limit", "long-run"].includes(mode)) throw new Error(`Unknown mode '${mode}'`);
-    if (mode === "limit" && ![1536, 1280, 1024, 768].includes(candidateMb)) {
+    const { mode = "measure", profile, candidateMb, pressureMb } = event.data;
+    if (!["measure", "limit", "long-run", "pressure"].includes(mode)) throw new Error(`Unknown mode '${mode}'`);
+    if (mode !== "pressure" && profile !== "preview" && profile !== "full") {
+      throw new Error(`Unknown profile '${profile}'`);
+    }
+    if (mode === "pressure" && profile !== "full") throw new Error("Pressure test requires the full profile");
+    if (mode === "limit" && ![4096, 3072, 2560, 2048, 1792, 1536, 1280, 1024, 768].includes(candidateMb)) {
       throw new Error(`Unknown memory candidate '${candidateMb}'`);
     }
-    if (mode === "limit") {
-      self.postMessage({ type: "limit-progress", stage: "加载候选产物", attemptStage: "fetching" });
+    if (mode === "pressure" && !PRESSURE_CANDIDATES.includes(pressureMb)) {
+      throw new Error(`Unknown pressure candidate '${pressureMb}'`);
+    }
+    if (mode === "limit" || mode === "pressure") {
+      self.postMessage({
+        type: mode === "pressure" ? "pressure-progress" : "limit-progress",
+        stage: mode === "pressure" ? "加载 full 产物" : "加载候选产物",
+        attemptStage: "fetching",
+      });
     }
 
     const stepName = mode === "long-run" ? "linkrods.step" : "screw.step";
@@ -21,8 +88,12 @@ self.addEventListener("message", async (event) => {
     const wasmUrl = mode === "limit"
       ? new URL(`./candidates/${candidateMb}/${profile}.wasm`, self.location.href)
       : new URL(`../../artifacts/${profile}.wasm`, self.location.href);
-    if (mode === "limit") {
-      self.postMessage({ type: "limit-progress", stage: "编译候选产物", attemptStage: "compiling" });
+    if (mode === "limit" || mode === "pressure") {
+      self.postMessage({
+        type: mode === "pressure" ? "pressure-progress" : "limit-progress",
+        stage: mode === "pressure" ? "编译 full 产物" : "编译候选产物",
+        attemptStage: "compiling",
+      });
     }
     const compileStarted = performance.now();
     const module = await WebAssembly.compileStreaming(fetch(wasmUrl, { cache: "no-store" }));
@@ -71,8 +142,12 @@ self.addEventListener("message", async (event) => {
     const wasi = new Proxy(stubs, {
       get: (target, property) => (property in target ? target[property] : () => 0),
     });
-    if (mode === "limit") {
-      self.postMessage({ type: "limit-progress", stage: "实例化候选产物", attemptStage: "instantiating" });
+    if (mode === "limit" || mode === "pressure") {
+      self.postMessage({
+        type: mode === "pressure" ? "pressure-progress" : "limit-progress",
+        stage: mode === "pressure" ? "实例化 full 产物" : "实例化候选产物",
+        attemptStage: "instantiating",
+      });
     }
     const instance = await WebAssembly.instantiate(module, { wasi_snapshot_preview1: wasi, env: wasi });
     const exports = instance.exports;
@@ -87,10 +162,10 @@ self.addEventListener("message", async (event) => {
       exports.__set_stack_limits(exports.emscripten_stack_get_base(), exports.emscripten_stack_get_end());
     }
     exports._initialize?.();
-    if (mode === "limit") {
+    if (mode === "limit" || mode === "pressure") {
       self.postMessage({
-        type: "limit-progress",
-        stage: "执行典型负载",
+        type: mode === "pressure" ? "pressure-progress" : "limit-progress",
+        stage: mode === "pressure" ? "执行 full 典型负载" : "执行典型负载",
         attemptStage: "ready",
         memoryMb: memory.buffer.byteLength / MEBIBYTE,
       });
@@ -228,27 +303,52 @@ self.addEventListener("message", async (event) => {
       trackMemory();
     }
 
+    if (mode === "pressure") {
+      await runPressureTest(memory, call, scopeId, pressureMb);
+      return;
+    }
     call("endScope", { scopeId });
     if (mode === "limit") {
       const growPages = 256;
+      let touchChecksum = 0;
       while (true) {
         self.postMessage({
           type: "limit-progress",
-          stage: "增长并写满 wasm 线性内存",
+          stage: "增长并触碰 wasm 线性内存页",
           attemptStage: "growing",
           memoryMb: memory.buffer.byteLength / MEBIBYTE,
+          touchChecksum,
         });
         await new Promise((resolve) => setTimeout(resolve, 50));
         try {
           const previousPages = memory.grow(growPages);
-          new Uint8Array(memory.buffer, previousPages * 65536, growPages * 65536).fill(0xa5);
+          const grown = new Uint8Array(memory.buffer, previousPages * WASM_PAGE_BYTES, growPages * WASM_PAGE_BYTES);
+          for (let offset = 0; offset < grown.byteLength; offset += TOUCH_STRIDE_BYTES) {
+            grown[offset] = 0xa5;
+            touchChecksum = (touchChecksum + grown[offset]) >>> 0;
+          }
         } catch (error) {
           if (!(error instanceof RangeError)) throw error;
+          const lastObservedCapacityBytes = memory.buffer.byteLength;
+          const lastObservedCapacityPages = lastObservedCapacityBytes / WASM_PAGE_BYTES;
+          const declaredMaximumPages = candidateMb * MEBIBYTE / WASM_PAGE_BYTES;
+          const reachedDeclaredMaximum = lastObservedCapacityPages >= declaredMaximumPages;
+          const reachedWasm32Maximum = lastObservedCapacityPages >= WASM32_MAX_PAGES;
           self.postMessage({
             type: "limit-result",
             result: {
-              outcome: "range-error",
-              memoryMb: memory.buffer.byteLength / MEBIBYTE,
+              outcome: reachedDeclaredMaximum ? "range-error" : "allocation-error",
+              classification: reachedWasm32Maximum
+                ? "wasm32-address-space-maximum"
+                : reachedDeclaredMaximum
+                  ? "candidate-declared-maximum"
+                  : "runtime-allocation-limit",
+              declaredMaximumMb: candidateMb,
+              declaredMaximumPages,
+              lastObservedCapacityMb: lastObservedCapacityBytes / MEBIBYTE,
+              lastObservedCapacityPages,
+              wasm32MaximumMb: WASM32_MAX_MIB,
+              wasmTouchChecksum: touchChecksum,
               detail: `${error.name}: ${error.message}`,
             },
           });

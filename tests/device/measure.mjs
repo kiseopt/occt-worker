@@ -16,12 +16,22 @@ const limitButton = document.querySelector("#run-limit-test");
 const limitStatus = document.querySelector("#limit-status");
 const limitReport = document.querySelector("#limit-report");
 const copyLimitButton = document.querySelector("#copy-limit-results");
+const pressureCandidate = document.querySelector("#pressure-candidate");
+const pressureButton = document.querySelector("#run-pressure-test");
+const pressureStatus = document.querySelector("#pressure-status");
+const pressureReport = document.querySelector("#pressure-report");
+const copyPressureButton = document.querySelector("#copy-pressure-results");
 const results = { preview: undefined, full: undefined };
 const limitAttempts = new ArtifactLoadAttemptTracker(localStorage, {
   attemptKey: "occt-worker-device-limit-attempt",
   resultKey: "occt-worker-device-limit-result",
 });
+const pressureAttempts = new ArtifactLoadAttemptTracker(localStorage, {
+  attemptKey: "occt-worker-device-pressure-attempt",
+  resultKey: "occt-worker-device-pressure-result",
+});
 let limitResult;
+let pressureResult;
 
 const rows = [
   ["compileMs", "compileStreaming 耗时", "ms"],
@@ -95,6 +105,7 @@ function setBusy(busy) {
   fullButton.disabled = busy;
   longRunButton.disabled = busy;
   limitButton.disabled = busy;
+  pressureButton.disabled = busy;
 }
 
 function updateReport() {
@@ -273,7 +284,15 @@ function renderLimitResult() {
     `device: ${device.value.trim() || limitResult.device || "<未填写>"}`,
     `candidate: ${limitResult.candidate}`,
     `outcome: ${limitResult.outcome}`,
-    `wasm.linmem.mb: ${limitResult.memoryMb === undefined ? "unknown" : formatNumber(limitResult.memoryMb)}`,
+    `classification: ${limitResult.classification ?? (limitResult.outcome === "range-error"
+      ? Number(limitResult.declaredMaximumMb) === 4096 ? "wasm32-address-space-maximum" : "candidate-declared-maximum"
+      : "unknown")}`,
+    `candidate.declared.maximum.mb: ${limitResult.declaredMaximumMb === undefined ? "unknown" : formatNumber(limitResult.declaredMaximumMb)}`,
+    `candidate.declared.maximum.pages: ${limitResult.declaredMaximumPages === undefined ? "unknown" : limitResult.declaredMaximumPages}`,
+    `wasm.last.observed.capacity.mb: ${limitResult.lastObservedCapacityMb === undefined ? "unknown" : formatNumber(limitResult.lastObservedCapacityMb)}`,
+    `wasm.last.observed.capacity.pages: ${limitResult.lastObservedCapacityPages === undefined ? "unknown" : limitResult.lastObservedCapacityPages}`,
+    `wasm.touch.checksum: ${limitResult.wasmTouchChecksum === undefined ? "unknown" : limitResult.wasmTouchChecksum}`,
+    `wasm32.intrinsic.maximum.mb: ${limitResult.wasm32MaximumMb === undefined ? "4096.00" : formatNumber(limitResult.wasm32MaximumMb)}`,
     `detail: ${limitResult.detail}`,
   ].join("\n");
   copyLimitButton.disabled = false;
@@ -293,7 +312,7 @@ function runLimitWorker(profile, candidateMb) {
       worker.terminate();
       resolve({
         outcome: "worker-lost",
-        memoryMb: lastMemoryMb,
+        lastObservedCapacityMb: lastMemoryMb,
         detail: "Worker 失联或停止响应",
       });
     }, 30000);
@@ -303,7 +322,7 @@ function runLimitWorker(profile, candidateMb) {
         worker.terminate();
         resolve({
           outcome: "worker-lost",
-          memoryMb: lastMemoryMb,
+          lastObservedCapacityMb: lastMemoryMb,
           detail: "Worker 失联或停止响应",
         });
       }, 30000);
@@ -327,7 +346,7 @@ function runLimitWorker(profile, candidateMb) {
     worker.addEventListener("error", (event) => {
       clearTimeout(heartbeat);
       worker.terminate();
-      resolve({ outcome: "worker-lost", memoryMb: lastMemoryMb, detail: event.message });
+      resolve({ outcome: "worker-lost", lastObservedCapacityMb: lastMemoryMb, detail: event.message });
     }, { once: true });
     worker.postMessage({ mode: "limit", profile, candidateMb });
   });
@@ -343,7 +362,10 @@ async function runLimitTest() {
   const [profile, candidateMbText] = limitCandidate.value.split(":");
   const candidateMb = Number(candidateMbText);
   const candidate = `${profile}-${candidateMb}`;
-  limitAttempts.begin(candidate, "fetching", { device: device.value.trim() });
+  limitAttempts.begin(candidate, "fetching", {
+    device: device.value.trim(),
+    candidateMb,
+  });
   limitResult = undefined;
   renderLimitResult();
   limitStatus.dataset.state = "running";
@@ -354,12 +376,17 @@ async function runLimitTest() {
     storeLimitResult({
       ...outcome,
       candidate,
+      declaredMaximumMb: candidateMb,
       device: device.value.trim(),
     });
     limitStatus.dataset.state = outcome.outcome === "range-error" ? "complete" : "error";
     limitStatus.textContent = outcome.outcome === "range-error"
-      ? "已捕获 RangeError"
-      : "Worker 失联或停止响应";
+      ? outcome.classification === "wasm32-address-space-maximum"
+        ? "已到达 wasm32 固有 4 GiB 地址空间上限（不代表设备上限）"
+        : "已到达候选 wasm 声明上限（不代表设备上限）"
+      : outcome.outcome === "allocation-error"
+        ? "浏览器在候选声明上限前拒绝增长（不代表设备上限）"
+        : "Worker 失联或停止响应";
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     storeLimitResult({ candidate, device: device.value.trim(), outcome: "error", detail });
@@ -381,33 +408,217 @@ async function copyLimitResults() {
   }
 }
 
+function renderPressureResult() {
+  if (pressureResult === undefined) {
+    pressureReport.textContent = "测试完成或页面恢复后生成";
+    copyPressureButton.disabled = true;
+    return;
+  }
+  pressureReport.textContent = [
+    `device: ${device.value.trim() || pressureResult.device || "<未填写>"}`,
+    `candidate: ${pressureResult.candidate}`,
+    `outcome: ${pressureResult.outcome}`,
+    `pressure.target.mb: ${pressureResult.targetMb === undefined ? "unknown" : formatNumber(pressureResult.targetMb)}`,
+    `pressure.wasm.capacity.mb: ${pressureResult.wasmCapacityMb === undefined ? "unknown" : formatNumber(pressureResult.wasmCapacityMb)}`,
+    `pressure.allocated.mb: ${pressureResult.allocatedMb === undefined ? "unknown" : formatNumber(pressureResult.allocatedMb)}`,
+    `pressure.touch.checksum: ${pressureResult.touchChecksum === undefined ? "unknown" : pressureResult.touchChecksum}`,
+    `detail: ${pressureResult.detail ?? "none"}`,
+  ].join("\n");
+  copyPressureButton.disabled = false;
+}
+
+function storePressureResult(value) {
+  pressureResult = value;
+  pressureAttempts.complete({ ...value, status: value.outcome });
+  renderPressureResult();
+}
+
+function runPressureWorker(pressureMb) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(workerUrl, { type: "module" });
+    let lastAllocatedMb;
+    let heartbeat = setTimeout(() => {
+      worker.terminate();
+      resolve({
+        outcome: "worker-lost",
+        allocatedMb: lastAllocatedMb,
+        detail: "Worker 失联或停止响应",
+      });
+    }, 30000);
+    const resetHeartbeat = () => {
+      clearTimeout(heartbeat);
+      heartbeat = setTimeout(() => {
+        worker.terminate();
+        resolve({
+          outcome: "worker-lost",
+          allocatedMb: lastAllocatedMb,
+          detail: "Worker 失联或停止响应",
+        });
+      }, 30000);
+    };
+    worker.addEventListener("message", (event) => {
+      resetHeartbeat();
+      if (event.data.type === "pressure-progress") {
+        lastAllocatedMb = event.data.allocatedMb;
+        if (event.data.attemptStage !== undefined) pressureAttempts.update(event.data.attemptStage);
+        pressureStatus.textContent = `full + ${pressureMb} MiB: ${event.data.stage ?? "分配并触碰额外内存"}${lastAllocatedMb === undefined ? "" : ` (${formatNumber(lastAllocatedMb)} MB)`}`;
+        return;
+      }
+      clearTimeout(heartbeat);
+      worker.terminate();
+      if (event.data.type === "pressure-result") {
+        resolve(event.data.result);
+      } else if (event.data.type === "error") {
+        reject(new Error(event.data.error));
+      }
+    });
+    worker.addEventListener("error", (event) => {
+      clearTimeout(heartbeat);
+      worker.terminate();
+      resolve({ outcome: "worker-lost", allocatedMb: lastAllocatedMb, detail: event.message });
+    }, { once: true });
+    worker.postMessage({ mode: "pressure", profile: "full", pressureMb });
+  });
+}
+
+async function runPressureTest() {
+  if (device.value.trim() === "") {
+    pressureStatus.dataset.state = "error";
+    pressureStatus.textContent = "请先填写设备型号、系统版本和浏览器";
+    device.focus();
+    return;
+  }
+  const pressureMb = Number(pressureCandidate.value);
+  const candidate = `full-pressure-${pressureMb}`;
+  pressureAttempts.begin(candidate, "fetching", {
+    device: device.value.trim(),
+    candidateMb: pressureMb,
+  });
+  pressureResult = undefined;
+  renderPressureResult();
+  pressureStatus.dataset.state = "running";
+  pressureStatus.textContent = `full + ${pressureMb} MiB: 启动`;
+  setBusy(true);
+  try {
+    const outcome = await runPressureWorker(pressureMb);
+    storePressureResult({
+      ...outcome,
+      candidate,
+      targetMb: pressureMb,
+      device: device.value.trim(),
+    });
+    pressureStatus.dataset.state = outcome.outcome === "pressure-complete" ? "complete" : "error";
+    pressureStatus.textContent = outcome.outcome === "pressure-complete"
+      ? "目标压力已触碰；这不是设备安全上限"
+      : outcome.outcome === "allocation-error"
+        ? "分配失败；这不是设备安全上限"
+        : "Worker 失联或停止响应";
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    storePressureResult({ candidate, targetMb: pressureMb, device: device.value.trim(), outcome: "error", detail });
+    pressureStatus.dataset.state = "error";
+    pressureStatus.textContent = detail;
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function copyPressureResults() {
+  try {
+    await copyText(pressureReport.textContent);
+    pressureStatus.dataset.state = "complete";
+    pressureStatus.textContent = "压力测试结果已复制";
+  } catch (error) {
+    pressureStatus.dataset.state = "error";
+    pressureStatus.textContent = error instanceof Error ? error.message : String(error);
+  }
+}
+
 try {
   const previousAttempt = limitAttempts.unfinished();
   const previousResult = limitAttempts.lastResult();
   if (previousAttempt !== undefined) {
+    const attemptedMaximumMb = Number(
+      previousAttempt.candidateMb ?? previousAttempt.subject?.split("-").at(-1),
+    );
     storeLimitResult({
       candidate: previousAttempt.subject,
       device: previousAttempt.device,
       outcome: "incomplete",
+      declaredMaximumMb: Number.isFinite(attemptedMaximumMb) ? attemptedMaximumMb : undefined,
       detail: `上次尝试未完成（阶段：${previousAttempt.stage}）；请结合测试时是否出现白屏或页面重载判断`,
     });
     limitStatus.dataset.state = "error";
     limitStatus.textContent = "上次尝试未完成";
   } else if (previousResult?.candidate !== undefined) {
+    const recordedMaximumMb = Number(
+      previousResult.declaredMaximumMb ?? previousResult.candidate.split("-").at(-1),
+    );
     limitResult = {
       candidate: previousResult.candidate,
       device: previousResult.device,
       outcome: previousResult.outcome ?? previousResult.status,
-      memoryMb: previousResult.memoryMb,
+      classification: previousResult.classification
+        ?? ((previousResult.outcome ?? previousResult.status) === "range-error" && Number(recordedMaximumMb) === 4096
+          ? "wasm32-address-space-maximum"
+          : undefined),
+      declaredMaximumMb: Number.isFinite(recordedMaximumMb) ? recordedMaximumMb : undefined,
+      declaredMaximumPages: previousResult.declaredMaximumPages,
+      lastObservedCapacityMb: previousResult.lastObservedCapacityMb ?? previousResult.memoryMb,
+      lastObservedCapacityPages: previousResult.lastObservedCapacityPages,
+      wasm32MaximumMb: previousResult.wasm32MaximumMb,
       detail: previousResult.detail,
     };
     renderLimitResult();
     limitStatus.dataset.state = limitResult.outcome === "range-error" ? "complete" : "error";
-    limitStatus.textContent = `上次结果：${limitResult.outcome}`;
+    limitStatus.textContent = limitResult.outcome === "range-error"
+      ? limitResult.classification === "wasm32-address-space-maximum"
+        ? "上次结果：已到达 wasm32 固有 4 GiB 地址空间上限"
+        : "上次结果：已到达候选 wasm 声明上限"
+      : `上次结果：${limitResult.outcome}`;
   }
 } catch (error) {
   limitStatus.dataset.state = "error";
   limitStatus.textContent = error instanceof Error ? error.message : String(error);
+}
+
+try {
+  const previousAttempt = pressureAttempts.unfinished();
+  const previousResult = pressureAttempts.lastResult();
+  if (previousAttempt !== undefined) {
+    const attemptedTargetMb = Number(
+      previousAttempt.candidateMb ?? previousAttempt.subject?.split("-").at(-1),
+    );
+    storePressureResult({
+      candidate: previousAttempt.subject,
+      device: previousAttempt.device,
+      outcome: "incomplete",
+      targetMb: Number.isFinite(attemptedTargetMb) ? attemptedTargetMb : undefined,
+      detail: `上次压力测试未完成（阶段：${previousAttempt.stage}）；请结合测试时是否出现白屏或页面重载判断`,
+    });
+    pressureStatus.dataset.state = "error";
+    pressureStatus.textContent = "上次压力测试未完成";
+  } else if (previousResult?.candidate !== undefined) {
+    const recordedTargetMb = Number(
+      previousResult.targetMb ?? previousResult.candidate.split("-").at(-1),
+    );
+    pressureResult = {
+      candidate: previousResult.candidate,
+      device: previousResult.device,
+      outcome: previousResult.outcome ?? previousResult.status,
+      targetMb: Number.isFinite(recordedTargetMb) ? recordedTargetMb : undefined,
+      wasmCapacityMb: previousResult.wasmCapacityMb,
+      allocatedMb: previousResult.allocatedMb,
+      touchChecksum: previousResult.touchChecksum,
+      detail: previousResult.detail,
+    };
+    renderPressureResult();
+    pressureStatus.dataset.state = pressureResult.outcome === "pressure-complete" ? "complete" : "error";
+    pressureStatus.textContent = `上次压力测试结果：${pressureResult.outcome}`;
+  }
+} catch (error) {
+  pressureStatus.dataset.state = "error";
+  pressureStatus.textContent = error instanceof Error ? error.message : String(error);
 }
 
 previewButton.addEventListener("click", () => measure("preview"));
@@ -416,7 +627,10 @@ copyButton.addEventListener("click", copyResults);
 longRunButton.addEventListener("click", runLongRunTest);
 limitButton.addEventListener("click", runLimitTest);
 copyLimitButton.addEventListener("click", copyLimitResults);
+pressureButton.addEventListener("click", runPressureTest);
+copyPressureButton.addEventListener("click", copyPressureResults);
 device.addEventListener("input", () => {
   updateReport();
   renderLimitResult();
+  renderPressureResult();
 });

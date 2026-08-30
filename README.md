@@ -11,7 +11,7 @@ for Node.js and browser Workers.
 [![Node.js](https://img.shields.io/node/v/occt-worker.svg)](https://www.npmjs.com/package/occt-worker)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE-APACHE-2.0.txt)
 
-[中文说明](README.zh-CN.md) · [Documentation](docs/README.md) · [API reference](docs/api.md) · [Capability matrix](docs/capabilities.md)
+[中文说明](README.zh-CN.md) · [Documentation](docs/README.md) · [Getting started](docs/getting-started.md) · [API reference](docs/api.md) · [Capability matrix](docs/capabilities.md)
 
 **Current release:** `v1.2.0` · **Runtime:** Node.js `>=20` · **License:** Apache-2.0 for
 project code; see the distribution notices for OCCT and other third-party components.
@@ -170,6 +170,7 @@ with the notices in [LICENSES.md](LICENSES.md), [NOTICE](NOTICE), and
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Getting started](docs/getting-started.md)
 - [TypeScript API](docs/api.md)
 - [Protocol specification](docs/protocol.md)
 - [Capability matrix](docs/capabilities.md)

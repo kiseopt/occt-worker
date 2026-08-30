@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.3.0 - 2026-08-31
+
+### Changed
+
+- Release WebAssembly artifacts are optimized with `wasm-opt -O3` without `--converge`.
+  Converging to a fixed point was measured at 212s versus 34s for a further 288 bytes on
+  a 27 MB artifact, and six large artifacts run this step. Release artifacts are
+  correspondingly about 0.001% larger.
+- A release tag now promotes an immutable candidate built by the main CI run for that
+  exact commit, instead of rebuilding from the tag. A tag can only be pushed for a commit
+  that has already passed CI on main.
+- CI runs the standalone, shared and debug OCCT trees as parallel jobs, caches each OCCT
+  install, the ThinLTO codegen and the Emscripten sysroot, and runs browser tests as a
+  matrix rather than serially.
+- Pull requests build only the standalone artifact and run a reduced test matrix.
+
+### Added
+
+- Chinese translations of the getting started, API, protocol, capabilities, host
+  integration and code of conduct documents, cross-linked with their English originals.
+- `scripts/build-cache-key.mjs`, `scripts/write-candidate.mjs` and
+  `scripts/verify-candidate.mjs` supporting the cached build and candidate promotion.
+
 ## 1.2.0 - 2026-08-27
 
 ### Added

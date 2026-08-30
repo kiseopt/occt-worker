@@ -10,7 +10,7 @@ TypeScript 客户端。
 [![Node.js](https://img.shields.io/node/v/occt-worker.svg)](https://www.npmjs.com/package/occt-worker)
 [![许可证](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE-APACHE-2.0.txt)
 
-[English README](README.md) · [文档导航](docs/README.md) · [API 参考](docs/api.zh-CN.md) · [能力矩阵](docs/capabilities.zh-CN.md)
+[English README](README.md) · [文档导航](docs/README.md) · [使用指南](docs/getting-started.zh-CN.md) · [API 参考](docs/api.zh-CN.md) · [能力矩阵](docs/capabilities.zh-CN.md)
 
 **当前版本：** `v1.2.0` · **运行时：** Node.js `>=20` · **许可证：** 项目代码采用
 Apache-2.0；OCCT 和其他第三方组件请以分发通知为准。
@@ -46,6 +46,9 @@ npm install occt-worker
 > manifest；安装时不会按功能懒加载。浏览器首次使用时，shared Side/Profile 产物可通过
 > `resolveArtifact({ name })` 从 Release/CDN 懒加载，也可以用 `baseUrl` 或自定义 resolver
 > 指向私有镜像。
+
+首次使用请先阅读[使用指南](docs/getting-started.zh-CN.md)，其中按 Node.js、Worker、
+浏览器和源码构建分别给出运行路径。
 
 ## 快速开始
 
@@ -157,6 +160,7 @@ Release 构建、协议生成文件和 wasm 哈希由仓库脚本及 CI 校验�
 ## 文档
 
 - [文档导航](docs/README.md)
+- [使用指南](docs/getting-started.zh-CN.md)
 - [TypeScript API](docs/api.zh-CN.md)
 - [协议规范](docs/protocol.zh-CN.md)
 - [能力矩阵](docs/capabilities.zh-CN.md)
@@ -168,7 +172,7 @@ Release 构建、协议生成文件和 wasm 哈希由仓库脚本及 CI 校验�
 - [报告 Bug 或请求功能](https://github.com/kiseopt/occt-worker/issues)
 - [贡献指南](CONTRIBUTING.zh-CN.md)
 - [安全政策](SECURITY.zh-CN.md)
-- [行为规范](CODE_OF_CONDUCT.md)
+- [行为规范](CODE_OF_CONDUCT.zh-CN.md)
 - [发布版本](https://github.com/kiseopt/occt-worker/releases)
 
 ## 许可证

@@ -42,7 +42,8 @@ $env:PATH = (($toolPaths | Where-Object { $_ }) -join [IO.Path]::PathSeparator) 
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $emsdk 'emsdk_env.ps1') | Out-Null
 
-if (-not $SidesOnly) {
+$occtInstalled = Test-Path -LiteralPath (Join-Path $occtInstall 'include/opencascade/Standard.hxx')
+if (-not $SidesOnly -and -not $occtInstalled) {
   # 1. PIC/relocatable OCCT archives in a dedicated directory.
   & emcmake cmake -S (Join-Path $repo 'occt') -B $occtBuild -G Ninja `
     "-DCMAKE_BUILD_TYPE=$Configuration" `
@@ -56,9 +57,13 @@ if (-not $SidesOnly) {
 }
 
 # 2. Kernel configure for shared targets.
+# The PIC bitcode differs from the non-PIC install, so this cache stays separate.
+$thinltoCache = Join-Path $buildRoot 'thinlto-cache'
+New-Item -ItemType Directory -Force -Path $thinltoCache | Out-Null
 & emcmake cmake -S $repo -B $kernelBuild -G Ninja `
   "-DCMAKE_BUILD_TYPE=$Configuration" `
   "-DOCCT_ROOT=$occtInstall" `
+  "-DOCCT_WORKER_THINLTO_CACHE=$thinltoCache" `
   '-DKERNEL_BUILD_SHARED=ON'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & cmake --build $kernelBuild --parallel

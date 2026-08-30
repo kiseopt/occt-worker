@@ -20,6 +20,23 @@ endfunction()
 option(KERNEL_BUILD_SHARED "Build shared Main + Side targets instead of standalone full" OFF)
 option(KERNEL_BUILD_PROFILES "Build isolated standalone Profile targets" OFF)
 set(OCCT_WORKER_MAX_MEMORY "2147483648" CACHE STRING "wasm maximum memory in bytes")
+set(OCCT_WORKER_THINLTO_CACHE "" CACHE PATH
+  "Shared ThinLTO cache directory for Release links; empty disables caching")
+
+# ThinLTO redoes codegen over the whole OCCT bitcode on every link, and this
+# project links that bitcode 16 times (standalone, 5 profiles, Main, 9 Sides).
+# A persistent cache lets a repeated link reuse the previous codegen. Cache keys
+# fold in each module's import list, so links whose toolkit sets differ still
+# miss: the reliable win is across runs, not across profiles.
+function(kernel_thinlto_cache theTarget)
+  if(NOT OCCT_WORKER_THINLTO_CACHE)
+    return()
+  endif()
+  target_link_options(${theTarget} PRIVATE
+    "-Wl,--thinlto-cache-dir=${OCCT_WORKER_THINLTO_CACHE}"
+    "-Wl,--thinlto-cache-policy=cache_size_bytes=2g:prune_after=168h"
+  )
+endfunction()
 
 function(standalone_kernel_target theTarget theSourcesVariable theToolkitsVariable)
   add_executable(${theTarget} ${${theSourcesVariable}})
@@ -43,6 +60,7 @@ function(standalone_kernel_target theTarget theSourcesVariable theToolkitsVariab
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
     target_compile_options(${theTarget} PRIVATE -O3 -flto=thin)
     target_link_options(${theTarget} PRIVATE -O3 -flto=thin)
+    kernel_thinlto_cache(${theTarget})
   else()
     target_compile_options(${theTarget} PRIVATE -O0 -g3)
     target_link_options(${theTarget} PRIVATE -O0 -g3 -sASSERTIONS=2)
@@ -89,6 +107,7 @@ foreach(SIDE_ID IN LISTS OCCT_SIDE_IDS)
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
     target_compile_options(${SIDE_TARGET} PRIVATE -flto=thin)
     target_link_options(${SIDE_TARGET} PRIVATE -flto=thin)
+    kernel_thinlto_cache(${SIDE_TARGET})
   endif()
 endforeach()
 
@@ -155,6 +174,7 @@ set_property(TARGET shared-main APPEND PROPERTY LINK_DEPENDS
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_compile_options(shared-main PRIVATE -O2 -flto=thin)
   target_link_options(shared-main PRIVATE -O2 -flto=thin)
+  kernel_thinlto_cache(shared-main)
 else()
   target_compile_options(shared-main PRIVATE -O0 -g3)
   target_link_options(shared-main PRIVATE -O0 -g3 -sASSERTIONS=2)

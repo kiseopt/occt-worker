@@ -5,27 +5,29 @@ on:
     tags:
       - "v*"
 
+# actions: read is what lets this workflow find and download the candidate produced by
+# the main CI run for this exact commit.
 permissions:
   contents: write
   id-token: write
+  actions: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  promote:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/setup-node@v4
+      # No submodules and no npm ci: this workflow builds nothing. verify-candidate.mjs
+      # uses only Node builtins, and npm publishes a prebuilt tarball by path.
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: npm
           registry-url: https://registry.npmjs.org
-      - run: npm ci
       - name: Verify tag and package version
         shell: pwsh
         run: |
@@ -33,137 +35,72 @@ jobs:
           if ("v$packageVersion" -ne "${{ github.ref_name }}") {
             throw "Tag ${{ github.ref_name }} does not match package version $packageVersion"
           }
-      - run: npm run build:wasm
-      - name: Verify pristine OCCT source
+      # Exact-SHA lookup. Not "the newest artifact with the right name": the candidate
+      # must come from a successful main push of the very commit this tag points at.
+      - name: Locate release candidate
         shell: pwsh
-        run: |
-          $changes = git -C occt status --porcelain
-          if ($changes) {
-            $changes
-            throw 'OCCT source tree must be clean'
-          }
-      - run: npm run build:wasm:profiles
-      - run: npm run build:wasm:shared
-      - name: Verify modular artifacts and set release URLs
-        shell: pwsh
-        run: |
-          $releaseBase = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/"
-          node scripts/verify-artifacts.mjs --write --release-base-url $releaseBase
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - run: npm run test:artifacts
-      - name: Install Wasmtime
-        shell: pwsh
-        run: |
-          $wasmtime = & ./scripts/bootstrap-wasmtime.ps1
-          Split-Path -Parent $wasmtime | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - run: npm run build:wasm:wasmtime
-      - run: npm run test:wasmtime
-      - run: npm run build:wasm:debug
-      - run: npm test
-      - name: Verify source-generated files
-        run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
-      - run: npm run test:debug
-      - run: npx playwright install chromium firefox webkit
-      - run: npm run test:browser:all
-      - run: npm run bench -- --iterations=5
-      - name: Create release checksums
-        shell: pwsh
-        run: |
-          $mainHash = (Get-FileHash wasm/occt-worker.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
-          $wasmtimeHash = (Get-FileHash wasm/occt-worker.wasmtime.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$mainHash  occt-worker.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasm.sha256
-          "$wasmtimeHash  occt-worker.wasmtime.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasmtime.wasm.sha256
-      - name: Pack npm release
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          $packOutput = & npm pack --json --pack-destination release-assets
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $pack = ($packOutput -join [Environment]::NewLine | ConvertFrom-Json)[0]
-          $tarball = (Resolve-Path (Join-Path release-assets $pack.filename)).Path
-          $version = node -p "require('./package.json').version"
-          "PACKAGE_TARBALL=$tarball" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "PACKAGE_INTEGRITY=$($pack.integrity)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Test packed npm release
-        shell: pwsh
-        run: npm run test:package -- "--tarball=$env:PACKAGE_TARBALL"
-      - name: Create corresponding source archive
-        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = '${{ github.ref_name }}'
-          $archiveBase = "occt-worker-$tag-corresponding-source"
-          $stageRoot = Join-Path $env:RUNNER_TEMP $archiveBase
-          $releaseAssets = Join-Path $PWD 'release-assets'
-          New-Item -ItemType Directory -Force -Path $stageRoot, $releaseAssets | Out-Null
-
-          $projectArchive = Join-Path $env:RUNNER_TEMP 'occt-worker-project.tar'
-          & git archive --format=tar HEAD --output=$projectArchive
+          $sha = '${{ github.sha }}'
+          $query = "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=$sha&status=success&event=push&branch=main"
+          $runs = (& gh api $query | ConvertFrom-Json).workflow_runs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & tar -xf $projectArchive -C $stageRoot
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          $identity = Get-Content -Raw (Join-Path $stageRoot 'protocol/artifacts.json') | ConvertFrom-Json
-          $sources = @($identity.sources.PSObject.Properties | ForEach-Object { $_.Value })
-          foreach ($source in $sources) {
-            $actualCommit = (& git -C $source.Path rev-parse HEAD).Trim()
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            if ($actualCommit -ne $source.Commit) {
-              throw "$($source.Path) is $actualCommit; expected $($source.Commit)"
-            }
-            $destination = Join-Path $stageRoot $source.Path
-            New-Item -ItemType Directory -Force -Path $destination | Out-Null
-            $sourceArchive = Join-Path $env:RUNNER_TEMP (($source.Path -replace '[\\/]', '-') + '.tar')
-            & git -C $source.Path archive --format=tar HEAD --output=$sourceArchive
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            & tar -xf $sourceArchive -C $destination
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $runs = @($runs | Where-Object { $_.head_sha -eq $sha -and $_.conclusion -eq 'success' })
+          if ($runs.Count -eq 0) {
+            throw "No successful main CI run found for $sha. A tag can only promote a commit that passed CI on main; push the commit to main first, or re-run CI for it."
           }
-          $occtSource = $sources | Where-Object { $_.Path -eq 'occt' }
-          $emsdkSource = $sources | Where-Object { $_.Path -eq 'vendor/emsdk' }
-          $jsonSource = $sources | Where-Object { $_.Path -eq 'vendor/json' }
-
-          $projectCommit = (& git rev-parse HEAD).Trim()
+          $runId = ($runs | Sort-Object { [datetime]$_.created_at } -Descending)[0].id
+          Write-Output "Promoting candidate from CI run $runId"
+          "CANDIDATE_RUN_ID=$runId" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Download release candidate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & gh run download $env:CANDIDATE_RUN_ID --name "release-candidate-${{ github.sha }}" --dir release-candidate
+          if ($LASTEXITCODE -ne 0) {
+            throw "Candidate release-candidate-${{ github.sha }} could not be downloaded from run $env:CANDIDATE_RUN_ID. Artifacts expire after 30 days; re-run CI for this commit to rebuild the candidate."
+          }
+      - name: Verify release candidate
+        shell: pwsh
+        run: |
+          node scripts/verify-candidate.mjs --dir release-candidate --tag ${{ github.ref_name }} --commit ${{ github.sha }}
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          @"
-          occt-worker release: $tag
-          occt-worker commit: $projectCommit
-          OCCT $($occtSource.Version) commit: $($occtSource.Commit) (unmodified upstream source)
-          Emscripten SDK $($emsdkSource.Version) commit: $($emsdkSource.Commit)
-          nlohmann/json $($jsonSource.Version) commit: $($jsonSource.Commit)
-          npm dependencies: locked by npm-shrinkwrap.json
-          "@ | Set-Content -Encoding ascii (Join-Path $stageRoot 'SOURCE-IDENTITIES.txt')
-
-          $sourceAsset = Join-Path $releaseAssets "$archiveBase.tar.gz"
-          & tar -czf $sourceAsset -C $env:RUNNER_TEMP $archiveBase
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $sourceHash = (Get-FileHash $sourceAsset -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$sourceHash  $archiveBase.tar.gz" | Set-Content -Encoding ascii "$sourceAsset.sha256"
+      - name: Read candidate manifest
+        shell: pwsh
+        run: |
+          $candidate = Get-Content -Raw release-candidate/candidate.json | ConvertFrom-Json
+          "PACKAGE_TARBALL=$((Resolve-Path (Join-Path 'release-candidate' $candidate.npm.filename)).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_INTEGRITY=$($candidate.npm.integrity)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_VERSION=$($candidate.version)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # npm tags whatever it publishes as "latest" unless told otherwise, prerelease
+          # versions included. A 1.3.0-rc.1 published without this would become the
+          # default install for everyone running "npm i occt-worker".
+          $isPrerelease = $candidate.version -match '-'
+          "PACKAGE_DIST_TAG=$(if ($isPrerelease) { 'rc' } else { 'latest' })" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "IS_PRERELEASE=$(if ($isPrerelease) { 'true' } else { 'false' })" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Stage GitHub release assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $fixedAssets = @(
-            'wasm/occt-worker.wasm',
-            'wasm/occt-worker.wasm.sha256',
-            'wasm/occt-worker.wasmtime.wasm',
-            'wasm/occt-worker.wasmtime.wasm.sha256',
-            'docs/g0-build.json',
-            'docs/wasmtime-build.json',
-            'protocol/artifacts.json'
+          $ErrorActionPreference = 'Stop'
+          $candidate = Get-Content -Raw release-candidate/candidate.json | ConvertFrom-Json
+          # Everything the candidate recorded except the npm tarball, which goes to the
+          # registry instead. candidate.json ships as provenance for the release.
+          $assets = @(
+            Get-ChildItem release-candidate -File |
+              Where-Object { $_.Name -ne $candidate.npm.filename } |
+              ForEach-Object { $_.FullName }
           )
-          $manifest = Get-Content 'protocol/artifacts.json' -Raw | ConvertFrom-Json
-          $modularAssets = @($manifest.artifacts.PSObject.Properties.Name | ForEach-Object { "artifacts/$_" })
-          $sourceAssets = @(
-            "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz",
-            "release-assets/occt-worker-${{ github.ref_name }}-corresponding-source.tar.gz.sha256"
-          )
-          $assets = $fixedAssets + $modularAssets + $sourceAssets
           $releaseJson = & gh release view "${{ github.ref_name }}" --json isDraft 2>$null
           if ($LASTEXITCODE -ne 0) {
-            & gh release create "${{ github.ref_name }}" --draft --generate-notes
+            $createArgs = @("${{ github.ref_name }}", '--draft', '--generate-notes')
+            if ($env:IS_PRERELEASE -eq 'true') { $createArgs += '--prerelease' }
+            & gh release create @createArgs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           & gh release upload "${{ github.ref_name }}" @assets --clobber
@@ -180,8 +117,9 @@ jobs:
             if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
           }
           if ($null -eq $published) {
-            & npm publish $env:PACKAGE_TARBALL --access public --provenance --ignore-scripts
+            & npm publish $env:PACKAGE_TARBALL --access public --provenance --ignore-scripts --tag $env:PACKAGE_DIST_TAG
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Write-Output "Published occt-worker@$env:PACKAGE_VERSION under dist-tag $env:PACKAGE_DIST_TAG"
           } elseif ($published.dist.integrity -ne $env:PACKAGE_INTEGRITY) {
             throw "npm package occt-worker@$env:PACKAGE_VERSION already exists with different contents; publish a new version"
           } else {

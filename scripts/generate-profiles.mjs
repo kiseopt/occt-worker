@@ -206,7 +206,23 @@ const capabilityRows = Object.entries(normalizedProfiles).map(([profileId, profi
   for (const artifact of profile.artifacts) appendUnique(modulesForProfile, artifactModuleCandidates[artifact] ?? []);
   return `| \`${profileId}\` | \`${profile.artifact}\` | ${alias === undefined ? "-" : `\`${alias}\``} | ${modulesForProfile.map((name) => `\`${name}\``).join(", ")} | ${profileOperations[profileId].length} |`;
 });
-const capabilityDoc = `<!-- Generated from protocol/modules.json. Do not edit. -->\n\n# Profile capabilities\n\nCompile-time capability narrowing applies only to the official profiles below. A custom wasm artifact supplied through the LGPL replacement path can differ from these types, so custom artifacts must be checked with runtime \`capabilities()\`.\n\nType narrowing does not remove methods from the underlying runtime object. Code that bypasses TypeScript can still attempt unsupported calls; the kernel capability check remains the runtime enforcement boundary.\n\n| Profile | Artifact | Alias of | Semantic modules | Operations |\n| --- | --- | --- | --- | ---: |\n${capabilityRows.join("\n")}\n`;
+const capabilityDoc = `<!-- Generated from protocol/modules.json. Do not edit. -->\n\n# Profile capabilities\n\n[中文说明 / Chinese translation](profile-capabilities.generated.zh-CN.md)\n\nCompile-time capability narrowing applies only to the official profiles below. A custom wasm artifact supplied through the LGPL replacement path can differ from these types, so custom artifacts must be checked with runtime \`capabilities()\`.\n\nType narrowing does not remove methods from the underlying runtime object. Code that bypasses TypeScript can still attempt unsupported calls; the kernel capability check remains the runtime enforcement boundary.\n\n| Profile | Artifact | Alias of | Semantic modules | Operations |\n| --- | --- | --- | --- | ---: |\n${capabilityRows.join("\n")}\n`;
+const capabilityDocZh = [
+  "<!-- Generated from protocol/modules.json. Do not edit. -->",
+  "",
+  "# Profile capabilities / Profile 能力",
+  "",
+  "[English reference / 英文规范](profile-capabilities.generated.md)",
+  "",
+  "编译期能力收窄只适用于下表由官方定义的 profile。通过 LGPL 替换路径提供的自定义 wasm 产物可能具有不同能力，因此必须用运行时 capabilities() 检查自定义产物。",
+  "",
+  "类型收窄不会从底层运行时对象移除方法。绕过 TypeScript 的代码仍可能尝试不支持的调用；内核能力检查仍是运行时的强制边界。",
+  "",
+  "| Profile / Profile | Artifact / 产物 | Alias of / 别名 | Semantic modules / 语义模块 | Operations / 操作 |",
+  "| --- | --- | --- | --- | ---: |",
+  ...capabilityRows,
+  "",
+].join("\n");
 const sizeBudgets = {
   generatedFrom,
   profiles: Object.fromEntries(buildProfiles.map(({ id, artifact }) => [id, {
@@ -226,5 +242,6 @@ await Promise.all([
   writeFile(new URL("../kernel/generated/profile-topology.generated.cmake", import.meta.url), `${cmakeLines.join("\n\n")}\n`),
   writeFile(new URL("../ts/src/profile-clients.generated.ts", import.meta.url), profileClients),
   writeFile(new URL("../docs/profile-capabilities.generated.md", import.meta.url), capabilityDoc),
+  writeFile(new URL("../docs/profile-capabilities.generated.zh-CN.md", import.meta.url), capabilityDocZh),
   writeFile(new URL("../.github/profile-size-budgets.generated.json", import.meta.url), `${JSON.stringify(sizeBudgets, null, 2)}\n`),
 ]);

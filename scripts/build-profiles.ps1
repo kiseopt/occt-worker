@@ -52,6 +52,9 @@ $cmakeArguments = @(
   "-DCMAKE_BUILD_TYPE=$Configuration"
   "-DOCCT_ROOT=$occtInstall"
   '-DKERNEL_BUILD_PROFILES=ON'
+  # Same directory build-wasm.ps1 uses: identical OCCT install, so an unchanged
+  # module relinked here can reuse the codegen cached by an earlier run.
+  "-DOCCT_WORKER_THINLTO_CACHE=$(Join-Path $configurationBuildRoot 'thinlto-cache')"
 )
 if ($PSBoundParameters.ContainsKey('MaxMemory')) {
   $cmakeArguments += "-DOCCT_WORKER_MAX_MEMORY=$MaxMemory"
@@ -86,7 +89,8 @@ foreach ($profile in $selectedProfiles) {
   $source = Join-Path $profileBuild "kernel/$($profile.target).wasm"
   $target = Join-Path $artifactDir $profile.artifact
   if ($Configuration -eq 'Release') {
-    & (Join-Path $emsdk 'upstream/bin/wasm-opt.exe') $source -O3 --all-features --converge -o $target
+    # No --converge; see the measurement recorded in scripts/build-wasm.ps1.
+    & (Join-Path $emsdk 'upstream/bin/wasm-opt.exe') $source -O3 --all-features -o $target
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   } else {
     Copy-Item -Force $source $target

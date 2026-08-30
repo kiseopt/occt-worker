@@ -1,5 +1,24 @@
 # 变更记录
 
+## 1.3.0 - 2026-08-31
+
+### 变更
+
+- 发布用 WebAssembly 产物改为 `wasm-opt -O3`，不再使用 `--converge`。在 27 MB 产物上实测：
+  收敛到不动点需 212 秒，而单趟 `-O3` 只需 34 秒，多出的 178 秒仅换来 288 字节；这一步在
+  6 个大产物上各跑一次。发布产物相应增大约 0.001%。
+- 发布标签改为提升由 main CI 针对同一提交构建出的不可变候选，不再从标签重新构建。只能为
+  已经通过 main CI 的提交打标签。
+- CI 将 standalone、shared、debug 三套 OCCT 拆为并行任务，分别缓存 OCCT install、ThinLTO
+  codegen 和 Emscripten sysroot；浏览器测试改为矩阵并行，不再串行。
+- Pull request 只构建 standalone 产物并运行精简测试矩阵。
+
+### 新增
+
+- 快速上手、API、协议、能力、宿主集成和行为准则文档的中文翻译，并与英文原文互相链接。
+- `scripts/build-cache-key.mjs`、`scripts/write-candidate.mjs` 和
+  `scripts/verify-candidate.mjs`，支撑缓存构建与候选提升流程。
+
 ## 1.2.0 - 2026-08-27
 
 ### 新增

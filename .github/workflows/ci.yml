@@ -7,9 +7,25 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+# A newer push to the same ref makes the older run's artifacts irrelevant. PR runs are
+# cancelled outright; main runs are allowed to finish because their output is what a
+# release tag will later promote.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  build-and-test:
+  # Three build jobs, one per OCCT tree. They run in parallel and each owns its own
+  # install prefix, so no multi-gigabyte tree is handed between jobs. A pull request runs
+  # the first two -- the test suite loads their artifacts directly -- and skips only the
+  # debug tree, the extra browsers, the benchmark and the release candidate.
+  release-path:
+    name: standalone + profiles
     runs-on: windows-latest
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v6
         with:
@@ -19,6 +35,34 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Compute OCCT cache key
+        id: occt
+        shell: pwsh
+        run: node scripts/build-cache-key.mjs --variant=release --github | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      # Exact match only, no restore-keys: a near-miss would hand the link archives
+      # built with different flags, and the artifact would still pass every later check.
+      - name: Restore OCCT install
+        uses: actions/cache@v4
+        with:
+          path: build/release/occt-install
+          key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
+      # restore-keys IS safe here, unlike above: lld validates every ThinLTO entry by
+      # hash, so a stale entry is a miss rather than something wrongly trusted. The key
+      # is fixed rather than rolling on the commit SHA: a rolling key would write a new
+      # multi-hundred-MB entry per push and evict the repo's 10 GB budget within days,
+      # and the OCCT modules that dominate this cache do not change between pushes.
+      - name: Restore ThinLTO cache
+        uses: actions/cache@v4
+        with:
+          path: build/release/thinlto-cache
+          key: ${{ runner.os }}-thinlto-release-${{ steps.occt.outputs.key }}
+      # Measured at 732 MB locally, rebuilt from scratch on every run today: a -flto=thin
+      # link makes Emscripten generate its thinlto libc++/libc++abi/compiler_rt variants.
+      - name: Restore Emscripten sysroot cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/emsdk/upstream/emscripten/cache
+          key: ${{ runner.os }}-emsdk-sysroot-release-${{ steps.occt.outputs.key }}
       - run: npm run build:wasm
       - name: Verify pristine OCCT source
         shell: pwsh
@@ -35,25 +79,299 @@ jobs:
           Split-Path -Parent $wasmtime | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - run: npm run build:wasm:wasmtime
       - run: npm run test:wasmtime
-      - run: npm run build:wasm:debug
+      # Profiles build on every run, pull requests included: tests/ts and tests/browser
+      # both load artifacts/preview.wasm, core-modeling.wasm and full.wasm directly, with
+      # no skip guard. Caching the OCCT tree is what makes a PR cheap, not skipping this.
       - run: npm run build:wasm:profiles
-      - run: npm run build:wasm:shared
-      - run: npm run test:artifacts
-      - run: node scripts/verify-symbol-closure.mjs --main artifacts/shared-main.wasm --side artifacts/geometry-topology.side.wasm --side artifacts/modeling.side.wasm --side artifacts/algorithms.side.wasm --side artifacts/mesh.side.wasm --side artifacts/exchange-mesh.side.wasm --side artifacts/exchange-cad.side.wasm
-      - run: npm test
-      - run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
-      - run: npm run test:debug
-      - run: npx playwright install chromium firefox webkit
-      - run: npm run test:browser:all
-      - run: npm run test:package
-      - run: npm run bench -- --iterations=5
       - uses: actions/upload-artifact@v6
         with:
-          name: occt-worker-wasm
+          name: release-path
           path: |
             wasm/occt-worker.wasm
             wasm/occt-worker.wasmtime.wasm
-            build/debug/occt-worker.debug.wasm
             artifacts/
             docs/g0-build.json
             docs/wasmtime-build.json
+
+  # Runs on pull requests too: tests/ts/shared-runtime.test.mjs loads the Main and Side
+  # modules directly, so skipping this job would break npm test rather than shorten it.
+  shared-path:
+    name: shared main + sides
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Compute OCCT cache key
+        id: occt
+        shell: pwsh
+        run: node scripts/build-cache-key.mjs --variant=shared-pic --github | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Restore PIC OCCT install
+        uses: actions/cache@v4
+        with:
+          path: build/release/shared/occt-install-pic
+          key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
+      - name: Restore ThinLTO cache
+        uses: actions/cache@v4
+        with:
+          path: build/release/shared/thinlto-cache
+          key: ${{ runner.os }}-thinlto-shared-${{ steps.occt.outputs.key }}
+      - name: Restore Emscripten sysroot cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/emsdk/upstream/emscripten/cache
+          key: ${{ runner.os }}-emsdk-sysroot-shared-${{ steps.occt.outputs.key }}
+      - run: npm run build:wasm:shared
+      - name: Verify pristine OCCT source
+        shell: pwsh
+        run: |
+          $changes = git -C occt status --porcelain
+          if ($changes) {
+            $changes
+            throw 'OCCT source tree must be clean'
+          }
+      # Runs here rather than in verify: it reads only the Main and Side modules this
+      # job produces, so it needs no cross-job dependency to be correct.
+      - run: node scripts/verify-symbol-closure.mjs --main artifacts/shared-main.wasm --side artifacts/geometry-topology.side.wasm --side artifacts/modeling.side.wasm --side artifacts/algorithms.side.wasm --side artifacts/mesh.side.wasm --side artifacts/exchange-mesh.side.wasm --side artifacts/exchange-cad.side.wasm
+      - uses: actions/upload-artifact@v6
+        with:
+          name: shared-path
+          path: artifacts/
+
+  debug-path:
+    name: debug kernel
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Compute OCCT cache key
+        id: occt
+        shell: pwsh
+        run: node scripts/build-cache-key.mjs --variant=debug --github | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Restore OCCT install
+        uses: actions/cache@v4
+        with:
+          path: build/debug/occt-install
+          key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
+      # Debug builds -O0 -g3 with no LTO, so it needs no ThinLTO cache -- but it still
+      # generates its own Emscripten sysroot variants.
+      - name: Restore Emscripten sysroot cache
+        uses: actions/cache@v4
+        with:
+          path: vendor/emsdk/upstream/emscripten/cache
+          key: ${{ runner.os }}-emsdk-sysroot-debug-${{ steps.occt.outputs.key }}
+      - run: npm run build:wasm:debug
+      - run: npm run test:debug
+      - uses: actions/upload-artifact@v6
+        with:
+          name: debug-path
+          path: build/debug/occt-worker.debug.wasm
+
+  # Everything that consumes finished artifacts rather than producing them. One job so
+  # the artifact set is downloaded once instead of five times.
+  verify:
+    name: verify and test
+    needs: [release-path, shared-path]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: "*-path"
+          merge-multiple: true
+      - run: npm test
+      - name: Verify source-generated files
+        run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
+      # test:artifacts runs in the candidate job and symbol closure in shared-path:
+      # profiles and shared each rewrite their own family into protocol/artifacts.json,
+      # so only a job holding every artifact at once can check a coherent manifest, and
+      # this job intentionally depends on release-path alone so it still runs on PRs.
+      # On main the candidate job runs test:package against the actual tarball it
+      # publishes; here it only needs to cover pull requests, which produce no candidate.
+      - if: github.event_name == 'pull_request'
+        run: npm run test:package
+      # Benchmarks on a shared 4-core runner are too noisy to gate a PR on; they run as
+      # a smoke check on main only.
+      - if: github.event_name != 'pull_request'
+        run: npm run bench -- --iterations=5
+
+  browser:
+    name: browser (${{ matrix.browser }})
+    needs: [release-path]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Serial chromium && firefox && webkit was three browsers on one clock; a PR
+        # only needs the first to catch a broken artifact.
+        browser: ${{ github.event_name == 'pull_request' && fromJSON('["chromium"]') || fromJSON('["chromium","firefox","webkit"]') }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v6
+        with:
+          name: release-path
+      - run: npx playwright install ${{ matrix.browser }}
+      - run: npm run test:browser -- --browser=${{ matrix.browser }}
+
+  # The single immutable candidate a release tag may later promote. Only a successful
+  # main push produces one, and it carries everything the tag will publish -- so the tag
+  # never rebuilds, and never picks "the newest artifact with the right name".
+  candidate:
+    name: release candidate
+    needs: [release-path, shared-path, debug-path, verify, browser]
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: "*-path"
+          merge-multiple: true
+      - name: Write final release URLs
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          # release.yml refuses any tag that is not "v$version", so the release URLs are
+          # already known here even though the tag does not exist yet. That is what lets
+          # the tested tarball be the published tarball.
+          $base = "https://github.com/${{ github.repository }}/releases/download/v$version/"
+          node scripts/verify-artifacts.mjs --write --release-base-url $base
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: npm run test:artifacts
+      - name: Create release checksums
+        shell: pwsh
+        run: |
+          $mainHash = (Get-FileHash wasm/occt-worker.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
+          $wasmtimeHash = (Get-FileHash wasm/occt-worker.wasmtime.wasm -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$mainHash  occt-worker.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasm.sha256
+          "$wasmtimeHash  occt-worker.wasmtime.wasm" | Set-Content -Encoding ascii wasm/occt-worker.wasmtime.wasm.sha256
+      - name: Pack npm release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-candidate | Out-Null
+          $packOutput = & npm pack --json --pack-destination release-candidate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $pack = ($packOutput -join [Environment]::NewLine | ConvertFrom-Json)[0]
+          "PACKAGE_TARBALL=$((Resolve-Path (Join-Path 'release-candidate' $pack.filename)).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_FILENAME=$($pack.filename)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKAGE_INTEGRITY=$($pack.integrity)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Test packed npm release
+        shell: pwsh
+        run: npm run test:package -- "--tarball=$env:PACKAGE_TARBALL"
+      - name: Create corresponding source archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = node -p "require('./package.json').version"
+          $archiveBase = "occt-worker-v$version-corresponding-source"
+          $stageRoot = Join-Path $env:RUNNER_TEMP $archiveBase
+          New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
+
+          $projectArchive = Join-Path $env:RUNNER_TEMP 'occt-worker-project.tar'
+          & git archive --format=tar HEAD --output=$projectArchive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & tar -xf $projectArchive -C $stageRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $identity = Get-Content -Raw (Join-Path $stageRoot 'protocol/artifacts.json') | ConvertFrom-Json
+          $sources = @($identity.sources.PSObject.Properties | ForEach-Object { $_.Value })
+          foreach ($source in $sources) {
+            $actualCommit = (& git -C $source.Path rev-parse HEAD).Trim()
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($actualCommit -ne $source.Commit) {
+              throw "$($source.Path) is $actualCommit; expected $($source.Commit)"
+            }
+            $destination = Join-Path $stageRoot $source.Path
+            New-Item -ItemType Directory -Force -Path $destination | Out-Null
+            $sourceArchive = Join-Path $env:RUNNER_TEMP (($source.Path -replace '[\\/]', '-') + '.tar')
+            & git -C $source.Path archive --format=tar HEAD --output=$sourceArchive
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & tar -xf $sourceArchive -C $destination
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $occtSource = $sources | Where-Object { $_.Path -eq 'occt' }
+          $emsdkSource = $sources | Where-Object { $_.Path -eq 'vendor/emsdk' }
+          $jsonSource = $sources | Where-Object { $_.Path -eq 'vendor/json' }
+          @"
+          occt-worker release: v$version
+          occt-worker commit: ${{ github.sha }}
+          OCCT $($occtSource.Version) commit: $($occtSource.Commit) (unmodified upstream source)
+          Emscripten SDK $($emsdkSource.Version) commit: $($emsdkSource.Commit)
+          nlohmann/json $($jsonSource.Version) commit: $($jsonSource.Commit)
+          npm dependencies: locked by npm-shrinkwrap.json
+          "@ | Set-Content -Encoding ascii (Join-Path $stageRoot 'SOURCE-IDENTITIES.txt')
+
+          $sourceAsset = Join-Path 'release-candidate' "$archiveBase.tar.gz"
+          & tar -czf $sourceAsset -C $env:RUNNER_TEMP $archiveBase
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $sourceHash = (Get-FileHash $sourceAsset -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sourceHash  $archiveBase.tar.gz" | Set-Content -Encoding ascii "$sourceAsset.sha256"
+      - name: Stage candidate assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Flat, because this is exactly the set the tag uploads to the GitHub Release.
+          # Debug is deliberately absent: it is a test artifact, not a release asset.
+          $fixed = @(
+            'wasm/occt-worker.wasm',
+            'wasm/occt-worker.wasm.sha256',
+            'wasm/occt-worker.wasmtime.wasm',
+            'wasm/occt-worker.wasmtime.wasm.sha256',
+            'docs/g0-build.json',
+            'docs/wasmtime-build.json',
+            'protocol/artifacts.json'
+          )
+          $manifest = Get-Content 'protocol/artifacts.json' -Raw | ConvertFrom-Json
+          $modular = @($manifest.artifacts.PSObject.Properties.Name | ForEach-Object { "artifacts/$_" })
+          foreach ($asset in ($fixed + $modular)) {
+            Copy-Item -Force $asset (Join-Path 'release-candidate' (Split-Path -Leaf $asset))
+          }
+      - name: Write candidate manifest
+        shell: pwsh
+        run: |
+          node scripts/write-candidate.mjs `
+            --dir release-candidate `
+            --commit ${{ github.sha }} `
+            --run-id ${{ github.run_id }} `
+            --tarball $env:PACKAGE_FILENAME `
+            --integrity $env:PACKAGE_INTEGRITY
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-candidate-${{ github.sha }}
+          path: release-candidate/
+          retention-days: 30

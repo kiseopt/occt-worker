@@ -1,5 +1,7 @@
 # Code of Conduct
 
+[中文说明 / Chinese translation](CODE_OF_CONDUCT.zh-CN.md)
+
 ## Expected behavior
 
 Participants are expected to be respectful, precise, and constructive. Assume
