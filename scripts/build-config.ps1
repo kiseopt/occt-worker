@@ -8,6 +8,7 @@ function Get-OcctWasmBuildConfig {
       "-ffile-prefix-map=$repoPosix=."
     )
     OcctCxxFlags = @(
+      '-flto=thin'
       '-fwasm-exceptions'
       '-ffp-contract=off'
       '-UOCC_CONVERT_SIGNALS'

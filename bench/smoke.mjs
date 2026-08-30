@@ -6,8 +6,13 @@ const argument = process.argv.find((value) => value.startsWith("--iterations="))
 const iterations = argument === undefined ? 5 : Number(argument.split("=")[1]);
 if (!Number.isInteger(iterations) || iterations < 1) throw new Error("iterations must be a positive integer");
 const baselineArgument = process.argv.find((value) => value.startsWith("--baseline="));
+const wasmArgument = process.argv.find((value) => value.startsWith("--wasm="));
 
-const wasm = await readFile(new URL("../wasm/occt-worker.wasm", import.meta.url));
+const wasm = await readFile(
+  wasmArgument === undefined
+    ? new URL("../wasm/occt-worker.wasm", import.meta.url)
+    : wasmArgument.slice("--wasm=".length),
+);
 const client = await DirectClient.create(wasm);
 const scope = await client.beginScope();
 const samples = { booleanCutMs: [], filletMs: [], tessellateMs: [] };

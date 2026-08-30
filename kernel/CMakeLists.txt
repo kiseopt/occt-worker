@@ -41,8 +41,8 @@ function(standalone_kernel_target theTarget theSourcesVariable theToolkitsVariab
     -sEXPORTED_FUNCTIONS=_k_alloc,_k_free,_k_handle,_k_response_ptr,_k_buffer_ptr,_k_buffer_len
   )
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    target_compile_options(${theTarget} PRIVATE -O3)
-    target_link_options(${theTarget} PRIVATE -O3 -flto)
+    target_compile_options(${theTarget} PRIVATE -O3 -flto=thin)
+    target_link_options(${theTarget} PRIVATE -O3 -flto=thin)
   else()
     target_compile_options(${theTarget} PRIVATE -O0 -g3)
     target_link_options(${theTarget} PRIVATE -O0 -g3 -sASSERTIONS=2)
@@ -86,6 +86,10 @@ foreach(SIDE_ID IN LISTS OCCT_SIDE_IDS)
     -sSIDE_MODULE=2
     -sENVIRONMENT=web,worker,node
   )
+  if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_options(${SIDE_TARGET} PRIVATE -flto=thin)
+    target_link_options(${SIDE_TARGET} PRIVATE -flto=thin)
+  endif()
 endforeach()
 
 find_program(NODE_BIN node REQUIRED)
@@ -149,8 +153,8 @@ set_property(TARGET shared-main APPEND PROPERTY LINK_DEPENDS
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-  target_compile_options(shared-main PRIVATE -O2)
-  target_link_options(shared-main PRIVATE -O2)
+  target_compile_options(shared-main PRIVATE -O2 -flto=thin)
+  target_link_options(shared-main PRIVATE -O2 -flto=thin)
 else()
   target_compile_options(shared-main PRIVATE -O0 -g3)
   target_link_options(shared-main PRIVATE -O0 -g3 -sASSERTIONS=2)
