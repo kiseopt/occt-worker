@@ -5,7 +5,7 @@ import type { ProfileRuntime, ProfileRuntimeFactory } from "./engine.js";
 import type { OperationName } from "./generated.js";
 import { PROFILE_OPERATIONS, type ProfileClientMap } from "./profile-clients.generated.js";
 import type { RequestOptions } from "./types.js";
-import { resolveArtifact, verifyArtifact, type ArtifactDescriptor, type ResolveOptions } from "./artifact-resolver.js";
+import { loadArtifactBytes, resolveArtifact, verifyArtifact, type ArtifactDescriptor, type ResolveOptions } from "./artifact-resolver.js";
 import { RUNTIME_CONFIG, type RuntimeProfileId } from "./runtime-manifest.generated.js";
 
 interface WorkerLike {
@@ -36,12 +36,9 @@ async function createWorkerClient(options: WorkerProfileOptions): Promise<Worker
   try {
     const url = await resolveArtifact(artifact, options);
     const bytes = options.loadArtifact === undefined
-      ? await fetch(url).then((response) => {
-          if (!response.ok) throw new Error(`failed to load '${artifact.name}': HTTP ${response.status}`);
-          return response.arrayBuffer();
-        })
+      ? await loadArtifactBytes(artifact, url)
       : await options.loadArtifact(url);
-    await verifyArtifact(artifact, bytes);
+    if (options.loadArtifact !== undefined) await verifyArtifact(artifact, bytes);
     const client = await WorkerClient.create(options.createWorker, bytes, {
       onInitializationStage: (stage) => {
         if (stage === "ready") return;

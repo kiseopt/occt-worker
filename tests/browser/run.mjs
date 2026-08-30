@@ -83,6 +83,12 @@ try {
     assert.equal(await attemptResult.getAttribute("data-state"), "passed", await attemptResult.textContent());
   }
 
+  const cachePage = await browser.newPage();
+  await cachePage.goto(`http://127.0.0.1:${address.port}/tests/browser/artifact-cache.html`);
+  const cacheResult = cachePage.locator("#result");
+  await cachePage.waitForFunction(() => document.querySelector("#result")?.dataset.state !== "running");
+  assert.equal(await cacheResult.getAttribute("data-state"), "passed", await cacheResult.textContent());
+
   console.log(JSON.stringify({
     browser: browserName,
     triangles: value.triangles,
@@ -90,6 +96,7 @@ try {
     longRunRounds: memoryResult.rounds,
     longRunLinearMemoryMb: memoryResult.wasmLinearMemoryCapacityMbByRound,
     fullLoadAttemptStates: ["success", "failure", "reload"],
+    artifactByteCache: true,
   }));
 } finally {
   await browser.close();

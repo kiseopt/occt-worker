@@ -37,6 +37,10 @@ export interface ResolveOptions {
   defaultBase?: string | URL;
 }
 
+export interface ArtifactByteLoadOptions {
+  cacheName?: string;
+}
+
 export const DEFAULT_ARTIFACT_BASE_URL =
   BUILD_IDENTITY.releaseBaseUrl;
 
@@ -71,4 +75,39 @@ export async function verifyArtifact(descriptor: ArtifactDescriptor, bytes: Arra
   if (actual !== descriptor.sha256.toLowerCase()) {
     throw new Error(`artifact '${descriptor.name}' SHA-256 mismatch`);
   }
+}
+
+export async function loadArtifactBytes(
+  descriptor: ArtifactDescriptor,
+  url: string,
+  options: ArtifactByteLoadOptions = {},
+): Promise<ArrayBuffer> {
+  let cache: Cache | undefined;
+  let cacheKey: string | undefined;
+  if (descriptor.sha256 !== undefined && typeof caches !== "undefined") {
+    cache = await caches.open(options.cacheName ?? "occt-worker-artifacts-v1");
+    const key = new URL(url, import.meta.url);
+    key.searchParams.set("occt-worker-artifact", descriptor.name);
+    key.searchParams.set("occt-worker-sha256", descriptor.sha256.toLowerCase());
+    cacheKey = key.toString();
+    const cached = await cache.match(cacheKey);
+    if (cached !== undefined) {
+      const bytes = await cached.arrayBuffer();
+      try {
+        await verifyArtifact(descriptor, bytes);
+        return bytes;
+      } catch {
+        await cache.delete(cacheKey);
+      }
+    }
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`failed to load '${descriptor.name}': HTTP ${response.status}`);
+  const bytes = await response.arrayBuffer();
+  await verifyArtifact(descriptor, bytes);
+  if (cache !== undefined && cacheKey !== undefined) {
+    await cache.put(cacheKey, new Response(bytes, { headers: { "Content-Type": "application/wasm" } }));
+  }
+  return bytes;
 }

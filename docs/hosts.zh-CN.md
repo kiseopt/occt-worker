@@ -42,4 +42,6 @@ Dedicated Worker 隔离让主页面能够报告 `abort()`、`RangeError` 等 Jav
 
 `ArtifactLoadAttemptTracker` 为完整 profile 加载提供这项启发式记录。将它作为 `loadAttempt` 传给 `createWorkerProfileRuntime` 后，加载流程会记录 `fetching`、`compiling`、`instantiating` 和 `ready`；加载成功或进入可捕获失败时，会清除活动标记并另存结果。应用重新载入后可通过 `unfinished()` 提示“上次加载完整功能未能完成”，但不能断言原因。真机测量页的内存上限候选也复用同一个记录器。
 
+浏览器会通过 Cache API 缓存带 SHA-256 描述符的正式 wasm 字节。缓存键同时包含 artifact 名称和哈希；每次命中仍重新验哈希，失效字节会被删除并重新下载。不会持久化编译后的 `WebAssembly.Module`。
+
 共享输入不会 detach，`requestShared()` 可把输出物化为 `SharedArrayBuffer`。即使使用共享内存，wasm 线性内存到宿主共享缓冲之间仍有一次必要复制。浏览器使用这些能力需要 cross-origin isolation。
