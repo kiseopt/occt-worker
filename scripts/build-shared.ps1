@@ -38,6 +38,12 @@ if ($occtChanges) {
 
 $toolPaths = & (Join-Path $repo 'scripts/bootstrap-tools.ps1')
 $env:PATH = (($toolPaths | Where-Object { $_ }) -join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $env:PATH
+# This script used to run only after build-wasm.ps1 had already installed the SDK into
+# the same workspace. It now runs on its own CI runner, so it installs the SDK itself.
+if (-not (Test-Path (Join-Path $emsdk 'upstream/emscripten/emcc.py'))) {
+  & (Join-Path $emsdk 'emsdk.ps1') install $buildConfig.EmsdkVersion
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 & (Join-Path $emsdk 'emsdk.ps1') activate $buildConfig.EmsdkVersion
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $emsdk 'emsdk_env.ps1') | Out-Null

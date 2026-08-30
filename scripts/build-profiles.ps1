@@ -44,6 +44,12 @@ if (-not (Test-Path -LiteralPath (Join-Path $occtInstall 'include/opencascade/St
 
 $toolPaths = & (Join-Path $repo 'scripts/bootstrap-tools.ps1')
 $env:PATH = (($toolPaths | Where-Object { $_ }) -join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $env:PATH
+# Same reason as build-shared.ps1: this no longer always follows build-wasm.ps1 in the
+# same workspace, so it must be able to install the SDK on its own.
+if (-not (Test-Path (Join-Path $emsdk 'upstream/emscripten/emcc.py'))) {
+  & (Join-Path $emsdk 'emsdk.ps1') install $buildConfig.EmsdkVersion
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 & (Join-Path $emsdk 'emsdk.ps1') activate $buildConfig.EmsdkVersion
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $emsdk 'emsdk_env.ps1') | Out-Null
