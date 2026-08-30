@@ -19,6 +19,7 @@ endfunction()
 
 option(KERNEL_BUILD_SHARED "Build shared Main + Side targets instead of standalone full" OFF)
 option(KERNEL_BUILD_PROFILES "Build isolated standalone Profile targets" OFF)
+set(OCCT_WORKER_MAX_MEMORY "2147483648" CACHE STRING "wasm maximum memory in bytes")
 
 function(standalone_kernel_target theTarget theSourcesVariable theToolkitsVariable)
   add_executable(${theTarget} ${${theSourcesVariable}})
@@ -33,7 +34,7 @@ function(standalone_kernel_target theTarget theSourcesVariable theToolkitsVariab
     "-Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/${theTarget}.map"
     -sSTANDALONE_WASM
     -sALLOW_MEMORY_GROWTH=1
-    -sMAXIMUM_MEMORY=2147483648
+    -sMAXIMUM_MEMORY=${OCCT_WORKER_MAX_MEMORY}
     -sSTACK_SIZE=5242880
     -sFILESYSTEM=0
     -sENVIRONMENT=web,worker,node
@@ -122,7 +123,7 @@ target_link_options(shared-main PRIVATE
   -ffp-contract=off
   -sMAIN_MODULE=2
   -sALLOW_MEMORY_GROWTH=1
-  -sMAXIMUM_MEMORY=2147483648
+  -sMAXIMUM_MEMORY=${OCCT_WORKER_MAX_MEMORY}
   -sSTACK_SIZE=5242880
   -sFILESYSTEM=0
   -sENVIRONMENT=web,worker,node

@@ -6,7 +6,14 @@ const previewButton = document.querySelector("#measure-preview");
 const fullButton = document.querySelector("#measure-full");
 const copyButton = document.querySelector("#copy-results");
 const report = document.querySelector("#report");
+const limitCandidate = document.querySelector("#limit-candidate");
+const limitButton = document.querySelector("#run-limit-test");
+const limitStatus = document.querySelector("#limit-status");
+const limitReport = document.querySelector("#limit-report");
+const copyLimitButton = document.querySelector("#copy-limit-results");
 const results = { preview: undefined, full: undefined };
+const limitAttemptKey = "occt-worker-device-limit-attempt";
+let limitResult;
 
 const rows = [
   ["compileMs", "compileStreaming 耗时", "ms"],
@@ -75,6 +82,12 @@ function formatNumber(value) {
   return value.toFixed(2);
 }
 
+function setBusy(busy) {
+  previewButton.disabled = busy;
+  fullButton.disabled = busy;
+  limitButton.disabled = busy;
+}
+
 function updateReport() {
   if (results.preview === undefined || results.full === undefined) {
     report.textContent = "preview 和 full 完成后生成";
@@ -113,8 +126,7 @@ function render(profile, value) {
 }
 
 async function measure(profile) {
-  previewButton.disabled = true;
-  fullButton.disabled = true;
+  setBusy(true);
   status.dataset.state = "running";
   const samples = [];
   try {
@@ -144,9 +156,24 @@ async function measure(profile) {
     status.dataset.state = "error";
     status.textContent = error instanceof Error ? error.message : String(error);
   } finally {
-    previewButton.disabled = false;
-    fullButton.disabled = false;
+    setBusy(false);
   }
+}
+
+async function copyText(value) {
+  if (navigator.clipboard?.writeText !== undefined) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const field = document.createElement("textarea");
+  field.value = value;
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.append(field);
+  field.select();
+  const copied = document.execCommand("copy");
+  field.remove();
+  if (!copied) throw new Error("浏览器拒绝复制结果");
 }
 
 async function copyResults() {
@@ -158,18 +185,7 @@ async function copyResults() {
   }
   updateReport();
   try {
-    if (navigator.clipboard?.writeText !== undefined) {
-      await navigator.clipboard.writeText(report.textContent);
-    } else {
-      const field = document.createElement("textarea");
-      field.value = report.textContent;
-      field.style.position = "fixed";
-      field.style.opacity = "0";
-      document.body.append(field);
-      field.select();
-      if (!document.execCommand("copy")) throw new Error("浏览器拒绝复制结果");
-      field.remove();
-    }
+    await copyText(report.textContent);
     status.dataset.state = "complete";
     status.textContent = "结果已复制";
   } catch (error) {
@@ -178,7 +194,161 @@ async function copyResults() {
   }
 }
 
+function renderLimitResult() {
+  if (limitResult === undefined) {
+    limitReport.textContent = "测试完成或页面恢复后生成";
+    copyLimitButton.disabled = true;
+    return;
+  }
+  limitReport.textContent = [
+    `device: ${device.value.trim() || limitResult.device || "<未填写>"}`,
+    `candidate: ${limitResult.candidate}`,
+    `outcome: ${limitResult.outcome}`,
+    `wasm.linmem.mb: ${limitResult.memoryMb === undefined ? "unknown" : formatNumber(limitResult.memoryMb)}`,
+    `detail: ${limitResult.detail}`,
+  ].join("\n");
+  copyLimitButton.disabled = false;
+}
+
+function storeLimitResult(value) {
+  limitResult = value;
+  localStorage.setItem(limitAttemptKey, JSON.stringify({ ...value, status: value.outcome }));
+  renderLimitResult();
+}
+
+function runLimitWorker(profile, candidateMb) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(workerUrl, { type: "module" });
+    let lastMemoryMb;
+    let heartbeat = setTimeout(() => {
+      worker.terminate();
+      resolve({
+        outcome: "worker-lost",
+        memoryMb: lastMemoryMb,
+        detail: "Worker 失联或停止响应",
+      });
+    }, 30000);
+    const resetHeartbeat = () => {
+      clearTimeout(heartbeat);
+      heartbeat = setTimeout(() => {
+        worker.terminate();
+        resolve({
+          outcome: "worker-lost",
+          memoryMb: lastMemoryMb,
+          detail: "Worker 失联或停止响应",
+        });
+      }, 30000);
+    };
+    worker.addEventListener("message", (event) => {
+      resetHeartbeat();
+      if (event.data.type === "limit-progress") {
+        lastMemoryMb = event.data.memoryMb;
+        limitStatus.textContent = `${profile} / ${candidateMb} MiB: ${event.data.stage}${lastMemoryMb === undefined ? "" : ` (${formatNumber(lastMemoryMb)} MB)`}`;
+        return;
+      }
+      clearTimeout(heartbeat);
+      worker.terminate();
+      if (event.data.type === "limit-result") {
+        resolve(event.data.result);
+      } else if (event.data.type === "error") {
+        reject(new Error(event.data.error));
+      }
+    });
+    worker.addEventListener("error", (event) => {
+      clearTimeout(heartbeat);
+      worker.terminate();
+      resolve({ outcome: "worker-lost", memoryMb: lastMemoryMb, detail: event.message });
+    }, { once: true });
+    worker.postMessage({ mode: "limit", profile, candidateMb });
+  });
+}
+
+async function runLimitTest() {
+  if (device.value.trim() === "") {
+    limitStatus.dataset.state = "error";
+    limitStatus.textContent = "请先填写设备型号、系统版本和浏览器";
+    device.focus();
+    return;
+  }
+  const [profile, candidateMbText] = limitCandidate.value.split(":");
+  const candidateMb = Number(candidateMbText);
+  const candidate = `${profile}-${candidateMb}`;
+  localStorage.setItem(limitAttemptKey, JSON.stringify({
+    status: "running",
+    candidate,
+    device: device.value.trim(),
+  }));
+  limitResult = undefined;
+  renderLimitResult();
+  limitStatus.dataset.state = "running";
+  limitStatus.textContent = `${profile} / ${candidateMb} MiB: 启动`;
+  setBusy(true);
+  try {
+    const outcome = await runLimitWorker(profile, candidateMb);
+    storeLimitResult({
+      ...outcome,
+      candidate,
+      device: device.value.trim(),
+    });
+    limitStatus.dataset.state = outcome.outcome === "range-error" ? "complete" : "error";
+    limitStatus.textContent = outcome.outcome === "range-error"
+      ? "已捕获 RangeError"
+      : "Worker 失联或停止响应";
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    storeLimitResult({ candidate, device: device.value.trim(), outcome: "error", detail });
+    limitStatus.dataset.state = "error";
+    limitStatus.textContent = detail;
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function copyLimitResults() {
+  try {
+    await copyText(limitReport.textContent);
+    limitStatus.dataset.state = "complete";
+    limitStatus.textContent = "二分结果已复制";
+  } catch (error) {
+    limitStatus.dataset.state = "error";
+    limitStatus.textContent = error instanceof Error ? error.message : String(error);
+  }
+}
+
+try {
+  const previous = JSON.parse(localStorage.getItem(limitAttemptKey) ?? "null");
+  if (previous?.status === "running") {
+    storeLimitResult({
+      candidate: previous.candidate,
+      device: previous.device,
+      outcome: "incomplete",
+      detail: "上次尝试未完成；请结合测试时是否出现白屏或页面重载判断",
+    });
+    limitStatus.dataset.state = "error";
+    limitStatus.textContent = "上次尝试未完成";
+  } else if (previous?.candidate !== undefined) {
+    limitResult = {
+      candidate: previous.candidate,
+      device: previous.device,
+      outcome: previous.outcome ?? previous.status,
+      memoryMb: previous.memoryMb,
+      detail: previous.detail,
+    };
+    renderLimitResult();
+    limitStatus.dataset.state = limitResult.outcome === "range-error" ? "complete" : "error";
+    limitStatus.textContent = `上次结果：${limitResult.outcome}`;
+  }
+} catch (error) {
+  limitStatus.dataset.state = "error";
+  limitStatus.textContent = error instanceof Error ? error.message : String(error);
+}
+
 previewButton.addEventListener("click", () => measure("preview"));
 fullButton.addEventListener("click", () => measure("full"));
 copyButton.addEventListener("click", copyResults);
-device.addEventListener("input", updateReport);
+limitButton.addEventListener("click", runLimitTest);
+copyLimitButton.addEventListener("click", copyLimitResults);
+device.addEventListener("input", () => {
+  updateReport();
+  renderLimitResult();
+});

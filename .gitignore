@@ -13,6 +13,7 @@ wasm/*.map
 /tmp-docs/
 /tmp-gdt.step
 /.claude/
+/tests/device/candidates/
 
 # Local credentials and key material.
 .env

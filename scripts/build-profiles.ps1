@@ -1,15 +1,30 @@
 param(
   [ValidateSet('Release', 'Debug')]
-  [string]$Configuration = 'Release'
+  [string]$Configuration = 'Release',
+  [string]$BuildRoot,
+  [string]$OutputDir,
+  [string[]]$Profiles = @(),
+  [switch]$SkipManifestWrite,
+  [long]$MaxMemory
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $emsdk = Join-Path $repo 'vendor/emsdk'
-$buildRoot = Join-Path $repo "build/$($Configuration.ToLowerInvariant())"
-$occtInstall = Join-Path $buildRoot 'occt-install'
-$profileBuild = Join-Path $buildRoot 'profiles'
-$artifactDir = Join-Path $repo 'artifacts'
+$configurationBuildRoot = Join-Path $repo "build/$($Configuration.ToLowerInvariant())"
+$occtInstall = Join-Path $configurationBuildRoot 'occt-install'
+$profileBuild = if ($PSBoundParameters.ContainsKey('BuildRoot')) {
+  $path = if ([IO.Path]::IsPathRooted($BuildRoot)) { $BuildRoot } else { Join-Path $repo $BuildRoot }
+  [IO.Path]::GetFullPath($path)
+} else {
+  Join-Path $configurationBuildRoot 'profiles'
+}
+$artifactDir = if ($PSBoundParameters.ContainsKey('OutputDir')) {
+  $path = if ([IO.Path]::IsPathRooted($OutputDir)) { $OutputDir } else { Join-Path $repo $OutputDir }
+  [IO.Path]::GetFullPath($path)
+} else {
+  Join-Path $repo 'artifacts'
+}
 . (Join-Path $PSScriptRoot 'build-config.ps1')
 $buildConfig = Get-OcctWasmBuildConfig
 
@@ -33,22 +48,40 @@ $env:PATH = (($toolPaths | Where-Object { $_ }) -join [IO.Path]::PathSeparator) 
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $emsdk 'emsdk_env.ps1') | Out-Null
 
-& emcmake cmake -S $repo -B $profileBuild -G Ninja `
-  "-DCMAKE_BUILD_TYPE=$Configuration" `
-  "-DOCCT_ROOT=$occtInstall" `
+$cmakeArguments = @(
+  "-DCMAKE_BUILD_TYPE=$Configuration"
+  "-DOCCT_ROOT=$occtInstall"
   '-DKERNEL_BUILD_PROFILES=ON'
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-& cmake --build $profileBuild --parallel
+)
+if ($PSBoundParameters.ContainsKey('MaxMemory')) {
+  $cmakeArguments += "-DOCCT_WORKER_MAX_MEMORY=$MaxMemory"
+}
+& emcmake cmake -S $repo -B $profileBuild -G Ninja @cmakeArguments
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$previewMap = Join-Path $profileBuild 'kernel/profile-preview.map'
-$previewSizeReport = Join-Path $profileBuild 'kernel/profile-preview.occt-sizes.md'
-& node (Join-Path $repo 'scripts/report-occt-link-map.mjs') $previewMap --output $previewSizeReport
+$topology = Get-Content -Raw (Join-Path $repo 'scripts/profile-topology.generated.json') | ConvertFrom-Json
+$selectedProfiles = if ($Profiles.Count -eq 0) {
+  @($topology.buildProfiles)
+} else {
+  $unknownProfiles = @($Profiles | Where-Object { $_ -notin $topology.buildProfiles.id })
+  if ($unknownProfiles.Count -ne 0) {
+    throw "Unknown build profile(s): $($unknownProfiles -join ', ')"
+  }
+  @($topology.buildProfiles | Where-Object { $_.id -in $Profiles })
+}
+$targets = @($selectedProfiles | ForEach-Object { $_.target })
+& cmake --build $profileBuild --parallel --target @targets
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+if ('preview' -in $selectedProfiles.id) {
+  $previewMap = Join-Path $profileBuild 'kernel/profile-preview.map'
+  $previewSizeReport = Join-Path $profileBuild 'kernel/profile-preview.occt-sizes.md'
+  & node (Join-Path $repo 'scripts/report-occt-link-map.mjs') $previewMap --output $previewSizeReport
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-$topology = Get-Content -Raw (Join-Path $repo 'scripts/profile-topology.generated.json') | ConvertFrom-Json
-foreach ($profile in $topology.buildProfiles) {
+foreach ($profile in $selectedProfiles) {
   $source = Join-Path $profileBuild "kernel/$($profile.target).wasm"
   $target = Join-Path $artifactDir $profile.artifact
   if ($Configuration -eq 'Release') {
@@ -60,5 +93,7 @@ foreach ($profile in $topology.buildProfiles) {
   node -e "new WebAssembly.Module(require('fs').readFileSync(process.argv[1]))" $target
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
-& node (Join-Path $repo 'scripts/verify-artifacts.mjs') --write --write-family isolated
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if (-not $SkipManifestWrite) {
+  & node (Join-Path $repo 'scripts/verify-artifacts.mjs') --write --write-family isolated
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}

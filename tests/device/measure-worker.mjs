@@ -2,15 +2,23 @@ const MEBIBYTE = 1024 * 1024;
 
 self.addEventListener("message", async (event) => {
   try {
-    const { profile } = event.data;
+    const { mode = "measure", profile, candidateMb } = event.data;
     if (profile !== "preview" && profile !== "full") throw new Error(`Unknown profile '${profile}'`);
+    if (mode === "limit" && ![1536, 1280, 1024, 768].includes(candidateMb)) {
+      throw new Error(`Unknown memory candidate '${candidateMb}'`);
+    }
+    if (mode === "limit") {
+      self.postMessage({ type: "limit-progress", stage: "加载候选产物" });
+    }
 
     const stepUrl = new URL("../../occt/data/step/screw.step", self.location.href);
     const stepResponse = await fetch(stepUrl);
     if (!stepResponse.ok) throw new Error(`STEP fixture request failed: HTTP ${stepResponse.status}`);
     const stepBytes = new Uint8Array(await stepResponse.arrayBuffer());
 
-    const wasmUrl = new URL(`../../artifacts/${profile}.wasm`, self.location.href);
+    const wasmUrl = mode === "limit"
+      ? new URL(`./candidates/${candidateMb}/${profile}.wasm`, self.location.href)
+      : new URL(`../../artifacts/${profile}.wasm`, self.location.href);
     const compileStarted = performance.now();
     const module = await WebAssembly.compileStreaming(fetch(wasmUrl, { cache: "no-store" }));
     const compileMs = performance.now() - compileStarted;
@@ -71,6 +79,13 @@ self.addEventListener("message", async (event) => {
       exports.__set_stack_limits(exports.emscripten_stack_get_base(), exports.emscripten_stack_get_end());
     }
     exports._initialize?.();
+    if (mode === "limit") {
+      self.postMessage({
+        type: "limit-progress",
+        stage: "执行典型负载",
+        memoryMb: memory.buffer.byteLength / MEBIBYTE,
+      });
+    }
 
     let requestId = 1;
     const call = (operation, args) => {
@@ -163,6 +178,32 @@ self.addEventListener("message", async (event) => {
     }
 
     call("endScope", { scopeId });
+    if (mode === "limit") {
+      const growPages = 256;
+      while (true) {
+        self.postMessage({
+          type: "limit-progress",
+          stage: "增长并写满 wasm 线性内存",
+          memoryMb: memory.buffer.byteLength / MEBIBYTE,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        try {
+          const previousPages = memory.grow(growPages);
+          new Uint8Array(memory.buffer, previousPages * 65536, growPages * 65536).fill(0xa5);
+        } catch (error) {
+          if (!(error instanceof RangeError)) throw error;
+          self.postMessage({
+            type: "limit-result",
+            result: {
+              outcome: "range-error",
+              memoryMb: memory.buffer.byteLength / MEBIBYTE,
+              detail: `${error.name}: ${error.message}`,
+            },
+          });
+          return;
+        }
+      }
+    }
     const jsHeapBytes = Number.isFinite(performance.memory?.usedJSHeapSize)
       ? performance.memory.usedJSHeapSize
       : undefined;

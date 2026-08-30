@@ -56,13 +56,13 @@
         font-weight: 650;
       }
 
-      input, button {
+      input, select, button {
         min-height: 42px;
         border-radius: 6px;
         font: inherit;
       }
 
-      input {
+      input, select {
         width: 100%;
         border: 1px solid #aeb8c2;
         padding: 0 12px;
@@ -70,7 +70,7 @@
         color: #17212b;
       }
 
-      input:focus {
+      input:focus, select:focus {
         border-color: #246b63;
         outline: 3px solid #cde7e2;
       }
@@ -136,9 +136,44 @@
       th { width: 68%; color: #4b5965; font-weight: 600; }
       td { color: #17212b; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-      .report-area {
+      .limit-test, .report-area {
         padding-top: 24px;
         border-top: 1px solid #cbd3da;
+      }
+
+      .limit-controls {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto;
+        gap: 12px;
+        align-items: end;
+        margin-top: 16px;
+      }
+
+      #limit-status {
+        min-height: 44px;
+        margin-top: 12px;
+        padding: 11px 12px;
+        border-left: 4px solid #71808d;
+        background: #e8edf1;
+        color: #35424e;
+        white-space: pre-wrap;
+      }
+
+      #limit-status[data-state="running"] { border-color: #a86c00; background: #fff2cc; }
+      #limit-status[data-state="complete"] { border-color: #247648; background: #dff3e8; }
+      #limit-status[data-state="error"] { border-color: #b3261e; background: #fde7e5; color: #7b1712; }
+
+      #limit-report {
+        min-height: 122px;
+        margin: 12px 0 24px;
+        padding: 14px;
+        overflow: auto;
+        border: 1px solid #cbd3da;
+        background: #fff;
+        color: #17212b;
+        font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
       .report-actions {
@@ -167,6 +202,7 @@
         .controls { grid-template-columns: 1fr 1fr; }
         .controls label { grid-column: 1 / -1; }
         .results { grid-template-columns: 1fr; gap: 24px; }
+        .limit-controls { grid-template-columns: 1fr; }
         .report-actions { align-items: stretch; flex-direction: column; }
         .report-actions button { width: 100%; }
       }
@@ -200,6 +236,32 @@
           <table><tbody id="full-results"></tbody></table>
         </section>
       </div>
+
+      <section class="limit-test" aria-labelledby="limit-title">
+        <h2 id="limit-title">内存上限二分测试</h2>
+        <div class="limit-controls">
+          <label>
+            候选产物
+            <select id="limit-candidate">
+              <option value="preview:1536">preview / 1536 MiB</option>
+              <option value="full:1536">full / 1536 MiB</option>
+              <option value="preview:1280">preview / 1280 MiB</option>
+              <option value="full:1280">full / 1280 MiB</option>
+              <option value="preview:1024">preview / 1024 MiB</option>
+              <option value="full:1024">full / 1024 MiB</option>
+              <option value="preview:768">preview / 768 MiB</option>
+              <option value="full:768">full / 768 MiB</option>
+            </select>
+          </label>
+          <button id="run-limit-test" type="button">开始二分测试</button>
+        </div>
+        <p id="limit-status" data-state="idle">等待测试</p>
+        <div class="report-actions">
+          <h2>二分结果</h2>
+          <button id="copy-limit-results" type="button" class="secondary" disabled>复制二分结果</button>
+        </div>
+        <pre id="limit-report">测试完成或页面恢复后生成</pre>
+      </section>
 
       <section class="report-area" aria-labelledby="report-title">
         <div class="report-actions">
