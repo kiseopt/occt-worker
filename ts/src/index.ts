@@ -12,6 +12,7 @@ export * from "./shared-loader.js";
 export * from "./shared-client.js";
 export * from "./artifact-resolver.js";
 export * from "./isolated-runtime.js";
+export * from "./profile-clients.generated.js";
 export * from "./single-runtime-session.js";
 export * from "./runtime-config.js";
 export { RUNTIME_CONFIG, type RuntimeProfileId } from "./runtime-manifest.generated.js";

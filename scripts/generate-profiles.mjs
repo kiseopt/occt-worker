@@ -157,14 +157,48 @@ for (const side of sides) {
 cmakeLines.push(cmakeList("OCCT_SHARED_MAIN_SOURCES", sharedMain.sources));
 cmakeLines.push(cmakeList("OCCT_SHARED_MAIN_TOOLKITS", sharedMain.toolkits));
 
-const profileOperations = Object.fromEntries(Object.entries(normalizedProfiles).map(([profileId, profile]) => {
-  const operations = [...(semanticModules.runtime ?? []), ...(modules.transferOperations ?? [])];
+const profileSemanticModules = Object.fromEntries(Object.entries(normalizedProfiles).map(([profileId, profile]) => {
+  const moduleIds = ["runtime"];
   for (const artifact of profile.artifacts) {
-    for (const moduleId of artifactModuleCandidates[artifact] ?? []) appendUnique(operations, semanticModules[moduleId] ?? []);
+    appendUnique(moduleIds, artifactModuleCandidates[artifact] ?? []);
   }
+  return [profileId, moduleIds];
+}));
+const profileOperations = Object.fromEntries(Object.entries(profileSemanticModules).map(([profileId, moduleIds]) => {
+  const operations = [...(modules.transferOperations ?? [])];
+  for (const moduleId of moduleIds) appendUnique(operations, semanticModules[moduleId] ?? []);
   return [profileId, operations];
 }));
-const profileClients = `// Generated from protocol/modules.json. Do not edit.\n\nexport const PROFILE_OPERATIONS = ${JSON.stringify(profileOperations, null, 2)} as const;\nexport type GeneratedProfileId = keyof typeof PROFILE_OPERATIONS;\n`;
+const typeName = (value) => value.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join("");
+const operationUnion = (operations) => operations.map((operation) => JSON.stringify(operation)).join(" | ") || "never";
+const moduleTypeLines = [];
+for (const [moduleId, operations] of Object.entries(semanticModules)) {
+  const name = typeName(moduleId);
+  const union = operationUnion(operations);
+  moduleTypeLines.push(`export type ${name}Ops = Pick<WorkerClient & ShapeScope, Extract<${union}, keyof (WorkerClient & ShapeScope)>>;`);
+  moduleTypeLines.push(`type ${name}ClientOps = Pick<WorkerClient, Exclude<Extract<${union}, keyof WorkerClient>, "beginScope">>;`);
+  moduleTypeLines.push(`type ${name}ScopeOps = Pick<ShapeScope, Extract<${union}, keyof ShapeScope>>;`);
+}
+const transferUnion = operationUnion(modules.transferOperations ?? []);
+moduleTypeLines.push(`export type TransferOps = Pick<WorkerClient & ShapeScope, Extract<${transferUnion}, keyof (WorkerClient & ShapeScope)>>;`);
+moduleTypeLines.push(`type TransferClientOps = Pick<WorkerClient, Extract<${transferUnion}, keyof WorkerClient>>;`);
+moduleTypeLines.push(`type TransferScopeOps = Pick<ShapeScope, Extract<${transferUnion}, keyof ShapeScope>>;`);
+
+const profileTypeLines = [];
+const profileClientEntries = [];
+for (const [profileId, moduleIds] of Object.entries(profileSemanticModules)) {
+  const profileName = profileId === "full-profile" ? "Full" : typeName(profileId);
+  const operationsName = `${profileName}Operation`;
+  const scopeName = `${profileName}Scope`;
+  const clientName = `${profileName}Client`;
+  const clientParts = ["TransferClientOps", ...moduleIds.map((moduleId) => `${typeName(moduleId)}ClientOps`)];
+  const scopeParts = ["ProfileScopeBase", "TransferScopeOps", ...moduleIds.map((moduleId) => `${typeName(moduleId)}ScopeOps`)];
+  profileTypeLines.push(`export type ${operationsName} = ${operationUnion(profileOperations[profileId])};`);
+  profileTypeLines.push(`export type ${scopeName} = ${scopeParts.join(" & ")};`);
+  profileTypeLines.push(`export type ${clientName} = ProfileClientBase<${scopeName}, ${operationsName}> & ${clientParts.join(" & ")};`);
+  profileClientEntries.push(`  ${JSON.stringify(profileId)}: ${clientName};`);
+}
+const profileClients = `// Generated from protocol/modules.json. Do not edit.\n\nimport type { ProtocolRequestArgs, ProtocolResult } from "./client-contract.js";\nimport type { OperationName } from "./generated.js";\nimport type { ShapeScope } from "./shape-scope.js";\nimport type { RequestOptions } from "./types.js";\nimport type { WorkerClient } from "./worker-client.js";\n\nexport const PROFILE_OPERATIONS = ${JSON.stringify(profileOperations, null, 2)} as const;\nexport type GeneratedProfileId = keyof typeof PROFILE_OPERATIONS;\n\ntype ProfileScopeBase = Pick<ShapeScope, "scopeId" | "end">;\ntype ProfileClientBase<Scope, Operations extends OperationName> = Pick<WorkerClient, "epoch" | "initialize" | "requestUnsafe" | "close"> & {\n  beginScope(): Promise<Scope>;\n  request<K extends Operations>(\n    operation: K,\n    args: ProtocolRequestArgs<K>,\n    timeoutOrOptions?: number | RequestOptions,\n  ): Promise<ProtocolResult<K>>;\n};\n\n${moduleTypeLines.join("\n")}\n\n${profileTypeLines.join("\n")}\n\nexport interface ProfileClientMap {\n${profileClientEntries.join("\n")}\n}\n`;
 
 const capabilityRows = Object.entries(normalizedProfiles).map(([profileId, profile]) => {
   const alias = profiles[profileId].aliasOf;
@@ -172,7 +206,7 @@ const capabilityRows = Object.entries(normalizedProfiles).map(([profileId, profi
   for (const artifact of profile.artifacts) appendUnique(modulesForProfile, artifactModuleCandidates[artifact] ?? []);
   return `| \`${profileId}\` | \`${profile.artifact}\` | ${alias === undefined ? "-" : `\`${alias}\``} | ${modulesForProfile.map((name) => `\`${name}\``).join(", ")} | ${profileOperations[profileId].length} |`;
 });
-const capabilityDoc = `<!-- Generated from protocol/modules.json. Do not edit. -->\n\n# Profile capabilities\n\n| Profile | Artifact | Alias of | Semantic modules | Operations |\n| --- | --- | --- | --- | ---: |\n${capabilityRows.join("\n")}\n`;
+const capabilityDoc = `<!-- Generated from protocol/modules.json. Do not edit. -->\n\n# Profile capabilities\n\nCompile-time capability narrowing applies only to the official profiles below. A custom wasm artifact supplied through the LGPL replacement path can differ from these types, so custom artifacts must be checked with runtime \`capabilities()\`.\n\nType narrowing does not remove methods from the underlying runtime object. Code that bypasses TypeScript can still attempt unsupported calls; the kernel capability check remains the runtime enforcement boundary.\n\n| Profile | Artifact | Alias of | Semantic modules | Operations |\n| --- | --- | --- | --- | ---: |\n${capabilityRows.join("\n")}\n`;
 const sizeBudgets = {
   generatedFrom,
   profiles: Object.fromEntries(buildProfiles.map(({ id, artifact }) => [id, {

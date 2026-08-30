@@ -2,6 +2,10 @@
 
 # Profile capabilities
 
+Compile-time capability narrowing applies only to the official profiles below. A custom wasm artifact supplied through the LGPL replacement path can differ from these types, so custom artifacts must be checked with runtime `capabilities()`.
+
+Type narrowing does not remove methods from the underlying runtime object. Code that bypasses TypeScript can still attempt unsupported calls; the kernel capability check remains the runtime enforcement boundary.
+
 | Profile | Artifact | Alias of | Semantic modules | Operations |
 | --- | --- | --- | --- | ---: |
 | `core-modeling` | `core-modeling.wasm` | - | `geometry-topology`, `topology-query`, `modeling`, `algorithms` | 134 |

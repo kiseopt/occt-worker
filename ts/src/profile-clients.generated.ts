@@ -1,7 +1,15 @@
 // Generated from protocol/modules.json. Do not edit.
 
+import type { ProtocolRequestArgs, ProtocolResult } from "./client-contract.js";
+import type { OperationName } from "./generated.js";
+import type { ShapeScope } from "./shape-scope.js";
+import type { RequestOptions } from "./types.js";
+import type { WorkerClient } from "./worker-client.js";
+
 export const PROFILE_OPERATIONS = {
   "core-modeling": [
+    "importBREP",
+    "exportBREP",
     "capabilities",
     "beginScope",
     "endScope",
@@ -11,8 +19,6 @@ export const PROFILE_OPERATIONS = {
     "freeBuffer",
     "stats",
     "batch",
-    "importBREP",
-    "exportBREP",
     "approximateCurveBSpline",
     "approximateSurfaceBSpline",
     "convertCurveToBSpline",
@@ -138,6 +144,8 @@ export const PROFILE_OPERATIONS = {
     "sweepPipeShell"
   ],
   "mesh": [
+    "importBREP",
+    "exportBREP",
     "capabilities",
     "beginScope",
     "endScope",
@@ -147,8 +155,6 @@ export const PROFILE_OPERATIONS = {
     "freeBuffer",
     "stats",
     "batch",
-    "importBREP",
-    "exportBREP",
     "approximateCurveBSpline",
     "approximateSurfaceBSpline",
     "convertCurveToBSpline",
@@ -280,6 +286,8 @@ export const PROFILE_OPERATIONS = {
     "repairTriangulation"
   ],
   "exchange": [
+    "importBREP",
+    "exportBREP",
     "capabilities",
     "beginScope",
     "endScope",
@@ -289,8 +297,6 @@ export const PROFILE_OPERATIONS = {
     "freeBuffer",
     "stats",
     "batch",
-    "importBREP",
-    "exportBREP",
     "importSTEP",
     "exportSTEP",
     "probeFormat",
@@ -314,6 +320,8 @@ export const PROFILE_OPERATIONS = {
     "exportVRML"
   ],
   "preview": [
+    "importBREP",
+    "exportBREP",
     "capabilities",
     "beginScope",
     "endScope",
@@ -323,8 +331,6 @@ export const PROFILE_OPERATIONS = {
     "freeBuffer",
     "stats",
     "batch",
-    "importBREP",
-    "exportBREP",
     "getSubShape",
     "getSubShapes",
     "shapeType",
@@ -341,6 +347,8 @@ export const PROFILE_OPERATIONS = {
     "probeFormat"
   ],
   "modeling-viewer": [
+    "importBREP",
+    "exportBREP",
     "capabilities",
     "beginScope",
     "endScope",
@@ -350,8 +358,6 @@ export const PROFILE_OPERATIONS = {
     "freeBuffer",
     "stats",
     "batch",
-    "importBREP",
-    "exportBREP",
     "approximateCurveBSpline",
     "approximateSurfaceBSpline",
     "convertCurveToBSpline",
@@ -483,6 +489,8 @@ export const PROFILE_OPERATIONS = {
     "repairTriangulation"
   ],
   "full-profile": [
+    "importBREP",
+    "exportBREP",
     "capabilities",
     "beginScope",
     "endScope",
@@ -492,8 +500,6 @@ export const PROFILE_OPERATIONS = {
     "freeBuffer",
     "stats",
     "batch",
-    "importBREP",
-    "exportBREP",
     "approximateCurveBSpline",
     "approximateSurfaceBSpline",
     "convertCurveToBSpline",
@@ -647,3 +653,75 @@ export const PROFILE_OPERATIONS = {
   ]
 } as const;
 export type GeneratedProfileId = keyof typeof PROFILE_OPERATIONS;
+
+type ProfileScopeBase = Pick<ShapeScope, "scopeId" | "end">;
+type ProfileClientBase<Scope, Operations extends OperationName> = Pick<WorkerClient, "epoch" | "initialize" | "requestUnsafe" | "close"> & {
+  beginScope(): Promise<Scope>;
+  request<K extends Operations>(
+    operation: K,
+    args: ProtocolRequestArgs<K>,
+    timeoutOrOptions?: number | RequestOptions,
+  ): Promise<ProtocolResult<K>>;
+};
+
+export type RuntimeOps = Pick<WorkerClient & ShapeScope, Extract<"capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch", keyof (WorkerClient & ShapeScope)>>;
+type RuntimeClientOps = Pick<WorkerClient, Exclude<Extract<"capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch", keyof WorkerClient>, "beginScope">>;
+type RuntimeScopeOps = Pick<ShapeScope, Extract<"capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch", keyof ShapeScope>>;
+export type GeometryTopologyOps = Pick<WorkerClient & ShapeScope, Extract<"approximateCurveBSpline" | "approximateSurfaceBSpline" | "convertCurveToBSpline" | "convertSurfaceToBSpline" | "curveContinuity" | "curveControlData" | "curveDomain" | "curveGeometry" | "editCurveBSpline" | "editSurfaceBSpline" | "evaluateCurve" | "evaluateSurface" | "extendCurve" | "extendSurface" | "reparameterizeCurve" | "reparameterizeSurface" | "reduceCurveDegree" | "reduceSurfaceDegree" | "trimCurve" | "trimSurface" | "updateCurvePole" | "updateSurfacePole" | "surfaceContinuity" | "surfaceControlData" | "surfaceDomain" | "surfaceGeometry" | "surfaceIsoCurve" | "makeEdgeArc" | "makeEdgeBezier" | "makeEdgeBSpline" | "makeEdgeCircle" | "makeEdgeEllipse" | "makeEdgeHelix" | "makeEdgeHyperbola" | "makeEdgeLine" | "makeEdgeOffset" | "makeEdgeParabola" | "makeVertex" | "makeWire" | "makePolygon" | "makeFace" | "makeFaceOnSurface" | "makeSurfaceBezier" | "makeSurfaceBSpline" | "makeSurfaceExtrusion" | "makeSurfaceFace" | "makeSurfaceFilling" | "makeSurfaceOffset" | "makeSurfaceRevolution" | "makeSurfaceRuled" | "inspectTolerances" | "setTolerance" | "isValid" | "diagnoseShape", keyof (WorkerClient & ShapeScope)>>;
+type GeometryTopologyClientOps = Pick<WorkerClient, Exclude<Extract<"approximateCurveBSpline" | "approximateSurfaceBSpline" | "convertCurveToBSpline" | "convertSurfaceToBSpline" | "curveContinuity" | "curveControlData" | "curveDomain" | "curveGeometry" | "editCurveBSpline" | "editSurfaceBSpline" | "evaluateCurve" | "evaluateSurface" | "extendCurve" | "extendSurface" | "reparameterizeCurve" | "reparameterizeSurface" | "reduceCurveDegree" | "reduceSurfaceDegree" | "trimCurve" | "trimSurface" | "updateCurvePole" | "updateSurfacePole" | "surfaceContinuity" | "surfaceControlData" | "surfaceDomain" | "surfaceGeometry" | "surfaceIsoCurve" | "makeEdgeArc" | "makeEdgeBezier" | "makeEdgeBSpline" | "makeEdgeCircle" | "makeEdgeEllipse" | "makeEdgeHelix" | "makeEdgeHyperbola" | "makeEdgeLine" | "makeEdgeOffset" | "makeEdgeParabola" | "makeVertex" | "makeWire" | "makePolygon" | "makeFace" | "makeFaceOnSurface" | "makeSurfaceBezier" | "makeSurfaceBSpline" | "makeSurfaceExtrusion" | "makeSurfaceFace" | "makeSurfaceFilling" | "makeSurfaceOffset" | "makeSurfaceRevolution" | "makeSurfaceRuled" | "inspectTolerances" | "setTolerance" | "isValid" | "diagnoseShape", keyof WorkerClient>, "beginScope">>;
+type GeometryTopologyScopeOps = Pick<ShapeScope, Extract<"approximateCurveBSpline" | "approximateSurfaceBSpline" | "convertCurveToBSpline" | "convertSurfaceToBSpline" | "curveContinuity" | "curveControlData" | "curveDomain" | "curveGeometry" | "editCurveBSpline" | "editSurfaceBSpline" | "evaluateCurve" | "evaluateSurface" | "extendCurve" | "extendSurface" | "reparameterizeCurve" | "reparameterizeSurface" | "reduceCurveDegree" | "reduceSurfaceDegree" | "trimCurve" | "trimSurface" | "updateCurvePole" | "updateSurfacePole" | "surfaceContinuity" | "surfaceControlData" | "surfaceDomain" | "surfaceGeometry" | "surfaceIsoCurve" | "makeEdgeArc" | "makeEdgeBezier" | "makeEdgeBSpline" | "makeEdgeCircle" | "makeEdgeEllipse" | "makeEdgeHelix" | "makeEdgeHyperbola" | "makeEdgeLine" | "makeEdgeOffset" | "makeEdgeParabola" | "makeVertex" | "makeWire" | "makePolygon" | "makeFace" | "makeFaceOnSurface" | "makeSurfaceBezier" | "makeSurfaceBSpline" | "makeSurfaceExtrusion" | "makeSurfaceFace" | "makeSurfaceFilling" | "makeSurfaceOffset" | "makeSurfaceRevolution" | "makeSurfaceRuled" | "inspectTolerances" | "setTolerance" | "isValid" | "diagnoseShape", keyof ShapeScope>>;
+export type TopologyQueryOps = Pick<WorkerClient & ShapeScope, Extract<"getSubShape" | "getSubShapes" | "shapeType" | "topologyCounts" | "getAdjacency" | "isSameShape" | "bbox" | "obb", keyof (WorkerClient & ShapeScope)>>;
+type TopologyQueryClientOps = Pick<WorkerClient, Exclude<Extract<"getSubShape" | "getSubShapes" | "shapeType" | "topologyCounts" | "getAdjacency" | "isSameShape" | "bbox" | "obb", keyof WorkerClient>, "beginScope">>;
+type TopologyQueryScopeOps = Pick<ShapeScope, Extract<"getSubShape" | "getSubShapes" | "shapeType" | "topologyCounts" | "getAdjacency" | "isSameShape" | "bbox" | "obb", keyof ShapeScope>>;
+export type ModelingOps = Pick<WorkerClient & ShapeScope, Extract<"makeBox" | "makeCone" | "makeCylinder" | "makeSphere" | "makeTorus" | "makeWedge" | "makeShell" | "makeSolidFromShell" | "makeCompSolid" | "makeCompound" | "makeHalfSpace" | "extrude" | "revolve" | "loft" | "sweepPipe" | "fillet" | "chamfer" | "hollow" | "draftAngle" | "defeature" | "cylindricalHole" | "linearForm" | "revolutionForm" | "localPrism" | "localRevolution" | "transform" | "translate" | "rotate" | "scale" | "mirror" | "batchTransformCopy" | "generalTransform", keyof (WorkerClient & ShapeScope)>>;
+type ModelingClientOps = Pick<WorkerClient, Exclude<Extract<"makeBox" | "makeCone" | "makeCylinder" | "makeSphere" | "makeTorus" | "makeWedge" | "makeShell" | "makeSolidFromShell" | "makeCompSolid" | "makeCompound" | "makeHalfSpace" | "extrude" | "revolve" | "loft" | "sweepPipe" | "fillet" | "chamfer" | "hollow" | "draftAngle" | "defeature" | "cylindricalHole" | "linearForm" | "revolutionForm" | "localPrism" | "localRevolution" | "transform" | "translate" | "rotate" | "scale" | "mirror" | "batchTransformCopy" | "generalTransform", keyof WorkerClient>, "beginScope">>;
+type ModelingScopeOps = Pick<ShapeScope, Extract<"makeBox" | "makeCone" | "makeCylinder" | "makeSphere" | "makeTorus" | "makeWedge" | "makeShell" | "makeSolidFromShell" | "makeCompSolid" | "makeCompound" | "makeHalfSpace" | "extrude" | "revolve" | "loft" | "sweepPipe" | "fillet" | "chamfer" | "hollow" | "draftAngle" | "defeature" | "cylindricalHole" | "linearForm" | "revolutionForm" | "localPrism" | "localRevolution" | "transform" | "translate" | "rotate" | "scale" | "mirror" | "batchTransformCopy" | "generalTransform", keyof ShapeScope>>;
+export type AlgorithmsOps = Pick<WorkerClient & ShapeScope, Extract<"booleanCommon" | "booleanCut" | "booleanFuse" | "section" | "split" | "generalFuse" | "selectGeneralFuseCells" | "glue" | "sew" | "distance" | "extremaCurveCurve" | "extremaCurveSurface" | "extremaSurfaceSurface" | "intersectCurveCurve" | "intersectCurveSurface" | "intersectSurfaceSurface" | "projectPointCurve" | "projectPointSurface" | "projectHLR" | "classifyPoint" | "sectionAnalysis" | "massProps" | "middlePath" | "offsetShape" | "offsetWire2D" | "fixShape" | "unifySameDomain" | "shapeUpgrade" | "sweepPipeShell", keyof (WorkerClient & ShapeScope)>>;
+type AlgorithmsClientOps = Pick<WorkerClient, Exclude<Extract<"booleanCommon" | "booleanCut" | "booleanFuse" | "section" | "split" | "generalFuse" | "selectGeneralFuseCells" | "glue" | "sew" | "distance" | "extremaCurveCurve" | "extremaCurveSurface" | "extremaSurfaceSurface" | "intersectCurveCurve" | "intersectCurveSurface" | "intersectSurfaceSurface" | "projectPointCurve" | "projectPointSurface" | "projectHLR" | "classifyPoint" | "sectionAnalysis" | "massProps" | "middlePath" | "offsetShape" | "offsetWire2D" | "fixShape" | "unifySameDomain" | "shapeUpgrade" | "sweepPipeShell", keyof WorkerClient>, "beginScope">>;
+type AlgorithmsScopeOps = Pick<ShapeScope, Extract<"booleanCommon" | "booleanCut" | "booleanFuse" | "section" | "split" | "generalFuse" | "selectGeneralFuseCells" | "glue" | "sew" | "distance" | "extremaCurveCurve" | "extremaCurveSurface" | "extremaSurfaceSurface" | "intersectCurveCurve" | "intersectCurveSurface" | "intersectSurfaceSurface" | "projectPointCurve" | "projectPointSurface" | "projectHLR" | "classifyPoint" | "sectionAnalysis" | "massProps" | "middlePath" | "offsetShape" | "offsetWire2D" | "fixShape" | "unifySameDomain" | "shapeUpgrade" | "sweepPipeShell", keyof ShapeScope>>;
+export type TessellationOps = Pick<WorkerClient & ShapeScope, Extract<"tessellate" | "tessellateEdges" | "triangulationData", keyof (WorkerClient & ShapeScope)>>;
+type TessellationClientOps = Pick<WorkerClient, Exclude<Extract<"tessellate" | "tessellateEdges" | "triangulationData", keyof WorkerClient>, "beginScope">>;
+type TessellationScopeOps = Pick<ShapeScope, Extract<"tessellate" | "tessellateEdges" | "triangulationData", keyof ShapeScope>>;
+export type MeshOps = Pick<WorkerClient & ShapeScope, Extract<"replaceTriangulation" | "validateTriangulation" | "repairTriangulation", keyof (WorkerClient & ShapeScope)>>;
+type MeshClientOps = Pick<WorkerClient, Exclude<Extract<"replaceTriangulation" | "validateTriangulation" | "repairTriangulation", keyof WorkerClient>, "beginScope">>;
+type MeshScopeOps = Pick<ShapeScope, Extract<"replaceTriangulation" | "validateTriangulation" | "repairTriangulation", keyof ShapeScope>>;
+export type ExchangeMeshOps = Pick<WorkerClient & ShapeScope, Extract<"importSTL" | "exportSTL" | "importPLY" | "exportPLY" | "importOBJ" | "exportOBJ" | "importGLTF" | "exportGLTF" | "importVRML" | "exportVRML", keyof (WorkerClient & ShapeScope)>>;
+type ExchangeMeshClientOps = Pick<WorkerClient, Exclude<Extract<"importSTL" | "exportSTL" | "importPLY" | "exportPLY" | "importOBJ" | "exportOBJ" | "importGLTF" | "exportGLTF" | "importVRML" | "exportVRML", keyof WorkerClient>, "beginScope">>;
+type ExchangeMeshScopeOps = Pick<ShapeScope, Extract<"importSTL" | "exportSTL" | "importPLY" | "exportPLY" | "importOBJ" | "exportOBJ" | "importGLTF" | "exportGLTF" | "importVRML" | "exportVRML", keyof ShapeScope>>;
+export type StepShapeExchangeOps = Pick<WorkerClient & ShapeScope, Extract<"importSTEP" | "exportSTEP" | "importBREP" | "exportBREP" | "probeFormat", keyof (WorkerClient & ShapeScope)>>;
+type StepShapeExchangeClientOps = Pick<WorkerClient, Exclude<Extract<"importSTEP" | "exportSTEP" | "importBREP" | "exportBREP" | "probeFormat", keyof WorkerClient>, "beginScope">>;
+type StepShapeExchangeScopeOps = Pick<ShapeScope, Extract<"importSTEP" | "exportSTEP" | "importBREP" | "exportBREP" | "probeFormat", keyof ShapeScope>>;
+export type CadDocumentExchangeOps = Pick<WorkerClient & ShapeScope, Extract<"importSTEPDocument" | "exportSTEPDocument" | "importIGES" | "exportIGES" | "importIGESDocument" | "exportIGESDocument" | "importXCAF" | "exportXCAF", keyof (WorkerClient & ShapeScope)>>;
+type CadDocumentExchangeClientOps = Pick<WorkerClient, Exclude<Extract<"importSTEPDocument" | "exportSTEPDocument" | "importIGES" | "exportIGES" | "importIGESDocument" | "exportIGESDocument" | "importXCAF" | "exportXCAF", keyof WorkerClient>, "beginScope">>;
+type CadDocumentExchangeScopeOps = Pick<ShapeScope, Extract<"importSTEPDocument" | "exportSTEPDocument" | "importIGES" | "exportIGES" | "importIGESDocument" | "exportIGESDocument" | "importXCAF" | "exportXCAF", keyof ShapeScope>>;
+export type TransferOps = Pick<WorkerClient & ShapeScope, Extract<"importBREP" | "exportBREP", keyof (WorkerClient & ShapeScope)>>;
+type TransferClientOps = Pick<WorkerClient, Extract<"importBREP" | "exportBREP", keyof WorkerClient>>;
+type TransferScopeOps = Pick<ShapeScope, Extract<"importBREP" | "exportBREP", keyof ShapeScope>>;
+
+export type CoreModelingOperation = "importBREP" | "exportBREP" | "capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch" | "approximateCurveBSpline" | "approximateSurfaceBSpline" | "convertCurveToBSpline" | "convertSurfaceToBSpline" | "curveContinuity" | "curveControlData" | "curveDomain" | "curveGeometry" | "editCurveBSpline" | "editSurfaceBSpline" | "evaluateCurve" | "evaluateSurface" | "extendCurve" | "extendSurface" | "reparameterizeCurve" | "reparameterizeSurface" | "reduceCurveDegree" | "reduceSurfaceDegree" | "trimCurve" | "trimSurface" | "updateCurvePole" | "updateSurfacePole" | "surfaceContinuity" | "surfaceControlData" | "surfaceDomain" | "surfaceGeometry" | "surfaceIsoCurve" | "makeEdgeArc" | "makeEdgeBezier" | "makeEdgeBSpline" | "makeEdgeCircle" | "makeEdgeEllipse" | "makeEdgeHelix" | "makeEdgeHyperbola" | "makeEdgeLine" | "makeEdgeOffset" | "makeEdgeParabola" | "makeVertex" | "makeWire" | "makePolygon" | "makeFace" | "makeFaceOnSurface" | "makeSurfaceBezier" | "makeSurfaceBSpline" | "makeSurfaceExtrusion" | "makeSurfaceFace" | "makeSurfaceFilling" | "makeSurfaceOffset" | "makeSurfaceRevolution" | "makeSurfaceRuled" | "inspectTolerances" | "setTolerance" | "isValid" | "diagnoseShape" | "getSubShape" | "getSubShapes" | "shapeType" | "topologyCounts" | "getAdjacency" | "isSameShape" | "bbox" | "obb" | "makeBox" | "makeCone" | "makeCylinder" | "makeSphere" | "makeTorus" | "makeWedge" | "makeShell" | "makeSolidFromShell" | "makeCompSolid" | "makeCompound" | "makeHalfSpace" | "extrude" | "revolve" | "loft" | "sweepPipe" | "fillet" | "chamfer" | "hollow" | "draftAngle" | "defeature" | "cylindricalHole" | "linearForm" | "revolutionForm" | "localPrism" | "localRevolution" | "transform" | "translate" | "rotate" | "scale" | "mirror" | "batchTransformCopy" | "generalTransform" | "booleanCommon" | "booleanCut" | "booleanFuse" | "section" | "split" | "generalFuse" | "selectGeneralFuseCells" | "glue" | "sew" | "distance" | "extremaCurveCurve" | "extremaCurveSurface" | "extremaSurfaceSurface" | "intersectCurveCurve" | "intersectCurveSurface" | "intersectSurfaceSurface" | "projectPointCurve" | "projectPointSurface" | "projectHLR" | "classifyPoint" | "sectionAnalysis" | "massProps" | "middlePath" | "offsetShape" | "offsetWire2D" | "fixShape" | "unifySameDomain" | "shapeUpgrade" | "sweepPipeShell";
+export type CoreModelingScope = ProfileScopeBase & TransferScopeOps & RuntimeScopeOps & GeometryTopologyScopeOps & TopologyQueryScopeOps & ModelingScopeOps & AlgorithmsScopeOps;
+export type CoreModelingClient = ProfileClientBase<CoreModelingScope, CoreModelingOperation> & TransferClientOps & RuntimeClientOps & GeometryTopologyClientOps & TopologyQueryClientOps & ModelingClientOps & AlgorithmsClientOps;
+export type MeshOperation = "importBREP" | "exportBREP" | "capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch" | "approximateCurveBSpline" | "approximateSurfaceBSpline" | "convertCurveToBSpline" | "convertSurfaceToBSpline" | "curveContinuity" | "curveControlData" | "curveDomain" | "curveGeometry" | "editCurveBSpline" | "editSurfaceBSpline" | "evaluateCurve" | "evaluateSurface" | "extendCurve" | "extendSurface" | "reparameterizeCurve" | "reparameterizeSurface" | "reduceCurveDegree" | "reduceSurfaceDegree" | "trimCurve" | "trimSurface" | "updateCurvePole" | "updateSurfacePole" | "surfaceContinuity" | "surfaceControlData" | "surfaceDomain" | "surfaceGeometry" | "surfaceIsoCurve" | "makeEdgeArc" | "makeEdgeBezier" | "makeEdgeBSpline" | "makeEdgeCircle" | "makeEdgeEllipse" | "makeEdgeHelix" | "makeEdgeHyperbola" | "makeEdgeLine" | "makeEdgeOffset" | "makeEdgeParabola" | "makeVertex" | "makeWire" | "makePolygon" | "makeFace" | "makeFaceOnSurface" | "makeSurfaceBezier" | "makeSurfaceBSpline" | "makeSurfaceExtrusion" | "makeSurfaceFace" | "makeSurfaceFilling" | "makeSurfaceOffset" | "makeSurfaceRevolution" | "makeSurfaceRuled" | "inspectTolerances" | "setTolerance" | "isValid" | "diagnoseShape" | "getSubShape" | "getSubShapes" | "shapeType" | "topologyCounts" | "getAdjacency" | "isSameShape" | "bbox" | "obb" | "makeBox" | "makeCone" | "makeCylinder" | "makeSphere" | "makeTorus" | "makeWedge" | "makeShell" | "makeSolidFromShell" | "makeCompSolid" | "makeCompound" | "makeHalfSpace" | "extrude" | "revolve" | "loft" | "sweepPipe" | "fillet" | "chamfer" | "hollow" | "draftAngle" | "defeature" | "cylindricalHole" | "linearForm" | "revolutionForm" | "localPrism" | "localRevolution" | "transform" | "translate" | "rotate" | "scale" | "mirror" | "batchTransformCopy" | "generalTransform" | "booleanCommon" | "booleanCut" | "booleanFuse" | "section" | "split" | "generalFuse" | "selectGeneralFuseCells" | "glue" | "sew" | "distance" | "extremaCurveCurve" | "extremaCurveSurface" | "extremaSurfaceSurface" | "intersectCurveCurve" | "intersectCurveSurface" | "intersectSurfaceSurface" | "projectPointCurve" | "projectPointSurface" | "projectHLR" | "classifyPoint" | "sectionAnalysis" | "massProps" | "middlePath" | "offsetShape" | "offsetWire2D" | "fixShape" | "unifySameDomain" | "shapeUpgrade" | "sweepPipeShell" | "tessellate" | "tessellateEdges" | "triangulationData" | "replaceTriangulation" | "validateTriangulation" | "repairTriangulation";
+export type MeshScope = ProfileScopeBase & TransferScopeOps & RuntimeScopeOps & GeometryTopologyScopeOps & TopologyQueryScopeOps & ModelingScopeOps & AlgorithmsScopeOps & TessellationScopeOps & MeshScopeOps;
+export type MeshClient = ProfileClientBase<MeshScope, MeshOperation> & TransferClientOps & RuntimeClientOps & GeometryTopologyClientOps & TopologyQueryClientOps & ModelingClientOps & AlgorithmsClientOps & TessellationClientOps & MeshClientOps;
+export type ExchangeOperation = "importBREP" | "exportBREP" | "capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch" | "importSTEP" | "exportSTEP" | "probeFormat" | "importSTEPDocument" | "exportSTEPDocument" | "importIGES" | "exportIGES" | "importIGESDocument" | "exportIGESDocument" | "importXCAF" | "exportXCAF" | "importSTL" | "exportSTL" | "importPLY" | "exportPLY" | "importOBJ" | "exportOBJ" | "importGLTF" | "exportGLTF" | "importVRML" | "exportVRML";
+export type ExchangeScope = ProfileScopeBase & TransferScopeOps & RuntimeScopeOps & StepShapeExchangeScopeOps & CadDocumentExchangeScopeOps & ExchangeMeshScopeOps;
+export type ExchangeClient = ProfileClientBase<ExchangeScope, ExchangeOperation> & TransferClientOps & RuntimeClientOps & StepShapeExchangeClientOps & CadDocumentExchangeClientOps & ExchangeMeshClientOps;
+export type PreviewOperation = "importBREP" | "exportBREP" | "capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch" | "getSubShape" | "getSubShapes" | "shapeType" | "topologyCounts" | "getAdjacency" | "isSameShape" | "bbox" | "obb" | "tessellate" | "tessellateEdges" | "triangulationData" | "importSTEP" | "exportSTEP" | "probeFormat";
+export type PreviewScope = ProfileScopeBase & TransferScopeOps & RuntimeScopeOps & TopologyQueryScopeOps & TessellationScopeOps & StepShapeExchangeScopeOps;
+export type PreviewClient = ProfileClientBase<PreviewScope, PreviewOperation> & TransferClientOps & RuntimeClientOps & TopologyQueryClientOps & TessellationClientOps & StepShapeExchangeClientOps;
+export type ModelingViewerOperation = "importBREP" | "exportBREP" | "capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch" | "approximateCurveBSpline" | "approximateSurfaceBSpline" | "convertCurveToBSpline" | "convertSurfaceToBSpline" | "curveContinuity" | "curveControlData" | "curveDomain" | "curveGeometry" | "editCurveBSpline" | "editSurfaceBSpline" | "evaluateCurve" | "evaluateSurface" | "extendCurve" | "extendSurface" | "reparameterizeCurve" | "reparameterizeSurface" | "reduceCurveDegree" | "reduceSurfaceDegree" | "trimCurve" | "trimSurface" | "updateCurvePole" | "updateSurfacePole" | "surfaceContinuity" | "surfaceControlData" | "surfaceDomain" | "surfaceGeometry" | "surfaceIsoCurve" | "makeEdgeArc" | "makeEdgeBezier" | "makeEdgeBSpline" | "makeEdgeCircle" | "makeEdgeEllipse" | "makeEdgeHelix" | "makeEdgeHyperbola" | "makeEdgeLine" | "makeEdgeOffset" | "makeEdgeParabola" | "makeVertex" | "makeWire" | "makePolygon" | "makeFace" | "makeFaceOnSurface" | "makeSurfaceBezier" | "makeSurfaceBSpline" | "makeSurfaceExtrusion" | "makeSurfaceFace" | "makeSurfaceFilling" | "makeSurfaceOffset" | "makeSurfaceRevolution" | "makeSurfaceRuled" | "inspectTolerances" | "setTolerance" | "isValid" | "diagnoseShape" | "getSubShape" | "getSubShapes" | "shapeType" | "topologyCounts" | "getAdjacency" | "isSameShape" | "bbox" | "obb" | "makeBox" | "makeCone" | "makeCylinder" | "makeSphere" | "makeTorus" | "makeWedge" | "makeShell" | "makeSolidFromShell" | "makeCompSolid" | "makeCompound" | "makeHalfSpace" | "extrude" | "revolve" | "loft" | "sweepPipe" | "fillet" | "chamfer" | "hollow" | "draftAngle" | "defeature" | "cylindricalHole" | "linearForm" | "revolutionForm" | "localPrism" | "localRevolution" | "transform" | "translate" | "rotate" | "scale" | "mirror" | "batchTransformCopy" | "generalTransform" | "booleanCommon" | "booleanCut" | "booleanFuse" | "section" | "split" | "generalFuse" | "selectGeneralFuseCells" | "glue" | "sew" | "distance" | "extremaCurveCurve" | "extremaCurveSurface" | "extremaSurfaceSurface" | "intersectCurveCurve" | "intersectCurveSurface" | "intersectSurfaceSurface" | "projectPointCurve" | "projectPointSurface" | "projectHLR" | "classifyPoint" | "sectionAnalysis" | "massProps" | "middlePath" | "offsetShape" | "offsetWire2D" | "fixShape" | "unifySameDomain" | "shapeUpgrade" | "sweepPipeShell" | "tessellate" | "tessellateEdges" | "triangulationData" | "replaceTriangulation" | "validateTriangulation" | "repairTriangulation";
+export type ModelingViewerScope = ProfileScopeBase & TransferScopeOps & RuntimeScopeOps & GeometryTopologyScopeOps & TopologyQueryScopeOps & ModelingScopeOps & AlgorithmsScopeOps & TessellationScopeOps & MeshScopeOps;
+export type ModelingViewerClient = ProfileClientBase<ModelingViewerScope, ModelingViewerOperation> & TransferClientOps & RuntimeClientOps & GeometryTopologyClientOps & TopologyQueryClientOps & ModelingClientOps & AlgorithmsClientOps & TessellationClientOps & MeshClientOps;
+export type FullOperation = "importBREP" | "exportBREP" | "capabilities" | "beginScope" | "endScope" | "release" | "releaseAll" | "createBuffer" | "freeBuffer" | "stats" | "batch" | "approximateCurveBSpline" | "approximateSurfaceBSpline" | "convertCurveToBSpline" | "convertSurfaceToBSpline" | "curveContinuity" | "curveControlData" | "curveDomain" | "curveGeometry" | "editCurveBSpline" | "editSurfaceBSpline" | "evaluateCurve" | "evaluateSurface" | "extendCurve" | "extendSurface" | "reparameterizeCurve" | "reparameterizeSurface" | "reduceCurveDegree" | "reduceSurfaceDegree" | "trimCurve" | "trimSurface" | "updateCurvePole" | "updateSurfacePole" | "surfaceContinuity" | "surfaceControlData" | "surfaceDomain" | "surfaceGeometry" | "surfaceIsoCurve" | "makeEdgeArc" | "makeEdgeBezier" | "makeEdgeBSpline" | "makeEdgeCircle" | "makeEdgeEllipse" | "makeEdgeHelix" | "makeEdgeHyperbola" | "makeEdgeLine" | "makeEdgeOffset" | "makeEdgeParabola" | "makeVertex" | "makeWire" | "makePolygon" | "makeFace" | "makeFaceOnSurface" | "makeSurfaceBezier" | "makeSurfaceBSpline" | "makeSurfaceExtrusion" | "makeSurfaceFace" | "makeSurfaceFilling" | "makeSurfaceOffset" | "makeSurfaceRevolution" | "makeSurfaceRuled" | "inspectTolerances" | "setTolerance" | "isValid" | "diagnoseShape" | "getSubShape" | "getSubShapes" | "shapeType" | "topologyCounts" | "getAdjacency" | "isSameShape" | "bbox" | "obb" | "makeBox" | "makeCone" | "makeCylinder" | "makeSphere" | "makeTorus" | "makeWedge" | "makeShell" | "makeSolidFromShell" | "makeCompSolid" | "makeCompound" | "makeHalfSpace" | "extrude" | "revolve" | "loft" | "sweepPipe" | "fillet" | "chamfer" | "hollow" | "draftAngle" | "defeature" | "cylindricalHole" | "linearForm" | "revolutionForm" | "localPrism" | "localRevolution" | "transform" | "translate" | "rotate" | "scale" | "mirror" | "batchTransformCopy" | "generalTransform" | "booleanCommon" | "booleanCut" | "booleanFuse" | "section" | "split" | "generalFuse" | "selectGeneralFuseCells" | "glue" | "sew" | "distance" | "extremaCurveCurve" | "extremaCurveSurface" | "extremaSurfaceSurface" | "intersectCurveCurve" | "intersectCurveSurface" | "intersectSurfaceSurface" | "projectPointCurve" | "projectPointSurface" | "projectHLR" | "classifyPoint" | "sectionAnalysis" | "massProps" | "middlePath" | "offsetShape" | "offsetWire2D" | "fixShape" | "unifySameDomain" | "shapeUpgrade" | "sweepPipeShell" | "tessellate" | "tessellateEdges" | "triangulationData" | "replaceTriangulation" | "validateTriangulation" | "repairTriangulation" | "importSTL" | "exportSTL" | "importPLY" | "exportPLY" | "importOBJ" | "exportOBJ" | "importGLTF" | "exportGLTF" | "importVRML" | "exportVRML" | "importSTEP" | "exportSTEP" | "probeFormat" | "importSTEPDocument" | "exportSTEPDocument" | "importIGES" | "exportIGES" | "importIGESDocument" | "exportIGESDocument" | "importXCAF" | "exportXCAF";
+export type FullScope = ProfileScopeBase & TransferScopeOps & RuntimeScopeOps & GeometryTopologyScopeOps & TopologyQueryScopeOps & ModelingScopeOps & AlgorithmsScopeOps & TessellationScopeOps & MeshScopeOps & ExchangeMeshScopeOps & StepShapeExchangeScopeOps & CadDocumentExchangeScopeOps;
+export type FullClient = ProfileClientBase<FullScope, FullOperation> & TransferClientOps & RuntimeClientOps & GeometryTopologyClientOps & TopologyQueryClientOps & ModelingClientOps & AlgorithmsClientOps & TessellationClientOps & MeshClientOps & ExchangeMeshClientOps & StepShapeExchangeClientOps & CadDocumentExchangeClientOps;
+
+export interface ProfileClientMap {
+  "core-modeling": CoreModelingClient;
+  "mesh": MeshClient;
+  "exchange": ExchangeClient;
+  "preview": PreviewClient;
+  "modeling-viewer": ModelingViewerClient;
+  "full-profile": FullClient;
+}

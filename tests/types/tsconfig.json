@@ -6,6 +6,7 @@
   },
   "files": [
     "protocol-handles.test.ts",
+    "profile-clients.test.ts",
     "../../ts/src/draco3dgltf.d.ts"
   ],
   "include": []
