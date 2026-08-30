@@ -16,6 +16,8 @@
 #define OCCT_SIDE_SEMANTIC_MODULE_modeling "modeling"
 #define OCCT_SIDE_NAME_algorithms "algorithms"
 #define OCCT_SIDE_SEMANTIC_MODULE_algorithms "algorithms"
+#define OCCT_SIDE_NAME_tessellation "tessellation"
+#define OCCT_SIDE_SEMANTIC_MODULE_tessellation "tessellation"
 #define OCCT_SIDE_NAME_mesh "mesh"
 #define OCCT_SIDE_SEMANTIC_MODULE_mesh "mesh"
 #define OCCT_SIDE_NAME_exchange_mesh "exchange-mesh"

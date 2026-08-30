@@ -352,16 +352,23 @@ inline constexpr std::array<const char*, 29> kAlgorithmsOperationNames = {
   OCCT_ALGORITHMS_OPERATION_TABLE(OCCT_OPERATION_NAME)
 };
 #undef OCCT_OPERATION_NAME
-#define OCCT_MESH_OPERATION_TABLE(X) \
+#define OCCT_TESSELLATION_OPERATION_TABLE(X) \
   X(tessellate) \
   X(tessellateEdges) \
-  X(triangulationData) \
+  X(triangulationData)
+
+#define OCCT_OPERATION_NAME(theOperation) #theOperation,
+inline constexpr std::array<const char*, 3> kTessellationOperationNames = {
+  OCCT_TESSELLATION_OPERATION_TABLE(OCCT_OPERATION_NAME)
+};
+#undef OCCT_OPERATION_NAME
+#define OCCT_MESH_OPERATION_TABLE(X) \
   X(replaceTriangulation) \
   X(validateTriangulation) \
   X(repairTriangulation)
 
 #define OCCT_OPERATION_NAME(theOperation) #theOperation,
-inline constexpr std::array<const char*, 6> kMeshOperationNames = {
+inline constexpr std::array<const char*, 3> kMeshOperationNames = {
   OCCT_MESH_OPERATION_TABLE(OCCT_OPERATION_NAME)
 };
 #undef OCCT_OPERATION_NAME

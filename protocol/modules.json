@@ -93,9 +93,11 @@
       "classifyPoint", "sectionAnalysis", "massProps", "middlePath",
       "offsetShape", "offsetWire2D", "fixShape", "unifySameDomain", "shapeUpgrade", "sweepPipeShell"
     ],
+    "tessellation": [
+      "tessellate", "tessellateEdges", "triangulationData"
+    ],
     "mesh": [
-      "tessellate", "tessellateEdges", "triangulationData", "replaceTriangulation",
-      "validateTriangulation", "repairTriangulation"
+      "replaceTriangulation", "validateTriangulation", "repairTriangulation"
     ],
     "exchange-mesh": [
       "importSTL", "exportSTL", "importPLY", "exportPLY",
@@ -115,6 +117,7 @@
     "topology-query.side.wasm": ["topology-query"],
     "modeling.side.wasm": ["modeling"],
     "algorithms.side.wasm": ["algorithms"],
+    "tessellation.side.wasm": ["tessellation"],
     "mesh.side.wasm": ["mesh"],
     "exchange-mesh.side.wasm": ["exchange-mesh"],
     "step-shape-exchange.side.wasm": ["step-shape-exchange"],
@@ -127,7 +130,7 @@
     },
     "mesh": {
       "artifact": "mesh.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm"]
+      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "tessellation.side.wasm", "mesh.side.wasm"]
     },
     "exchange": {
       "artifact": "exchange.wasm",
@@ -139,11 +142,11 @@
     },
     "modeling-viewer": {
       "artifact": "modeling-viewer.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm"]
+      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "tessellation.side.wasm", "mesh.side.wasm"]
     },
     "full-profile": {
       "artifact": "full.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "mesh.side.wasm", "exchange-mesh.side.wasm", "step-shape-exchange.side.wasm", "cad-document-exchange.side.wasm"]
+      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "tessellation.side.wasm", "mesh.side.wasm", "exchange-mesh.side.wasm", "step-shape-exchange.side.wasm", "cad-document-exchange.side.wasm"]
     }
   }
 }

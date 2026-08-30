@@ -47,6 +47,7 @@ set(ALGORITHMS_SOURCES
   operations/shape_upgrade.cpp
 )
 set(GROUP_SOURCES_algorithms ${ALGORITHMS_SOURCES})
+set(GROUP_SOURCES_tessellation operations/tessellation.cpp)
 set(GROUP_SOURCES_mesh operations/mesh.cpp)
 set(EXCHANGE_MESH_SOURCES
   operations/exchange_mesh.cpp
