@@ -1,4 +1,5 @@
 import { WorkerClient } from "./worker-client.js";
+import type { ArtifactLoadAttemptTracker } from "./artifact-load-attempt.js";
 import { assertOperationSet } from "./capability-assertion.js";
 import type { ProfileRuntime, ProfileRuntimeFactory } from "./engine.js";
 import type { OperationName } from "./generated.js";
@@ -17,6 +18,8 @@ interface WorkerLike {
 export interface WorkerProfileHostOptions extends ResolveOptions {
   createWorker(): WorkerLike;
   loadArtifact?(url: string): Promise<ArrayBuffer>;
+  loadAttempt?: ArtifactLoadAttemptTracker;
+  onLoadStage?(stage: "fetching" | "compiling" | "instantiating" | "ready"): void;
 }
 
 export type WorkerProfileOptions = WorkerProfileHostOptions & (
@@ -28,29 +31,45 @@ async function createWorkerClient(options: WorkerProfileOptions): Promise<Worker
   const artifact = options.profile === undefined
     ? options.artifact
     : RUNTIME_CONFIG.profiles[options.profile].artifact;
-  const url = await resolveArtifact(artifact, options);
-  const bytes = options.loadArtifact === undefined
-    ? await fetch(url).then((response) => {
-        if (!response.ok) throw new Error(`failed to load '${artifact.name}': HTTP ${response.status}`);
-        return response.arrayBuffer();
-      })
-    : await options.loadArtifact(url);
-  await verifyArtifact(artifact, bytes);
-  const client = await WorkerClient.create(options.createWorker, bytes);
-  if (options.profile !== undefined) {
-    try {
-      const capabilities = await client.initialize();
-      assertOperationSet(
-        `isolated profile '${options.profile}'`,
-        PROFILE_OPERATIONS[options.profile],
-        capabilities.ops,
-      );
-    } catch (error) {
-      client.close();
-      throw error;
+  options.loadAttempt?.begin(artifact.name, "fetching");
+  options.onLoadStage?.("fetching");
+  try {
+    const url = await resolveArtifact(artifact, options);
+    const bytes = options.loadArtifact === undefined
+      ? await fetch(url).then((response) => {
+          if (!response.ok) throw new Error(`failed to load '${artifact.name}': HTTP ${response.status}`);
+          return response.arrayBuffer();
+        })
+      : await options.loadArtifact(url);
+    await verifyArtifact(artifact, bytes);
+    const client = await WorkerClient.create(options.createWorker, bytes, {
+      onInitializationStage: (stage) => {
+        if (stage === "ready") return;
+        options.loadAttempt?.update(stage);
+        options.onLoadStage?.(stage);
+      },
+    });
+    if (options.profile !== undefined) {
+      try {
+        const capabilities = await client.initialize();
+        assertOperationSet(
+          `isolated profile '${options.profile}'`,
+          PROFILE_OPERATIONS[options.profile],
+          capabilities.ops,
+        );
+      } catch (error) {
+        client.close();
+        throw error;
+      }
     }
+    options.loadAttempt?.update("ready");
+    options.onLoadStage?.("ready");
+    options.loadAttempt?.complete({ status: "success" });
+    return client;
+  } catch (error) {
+    options.loadAttempt?.fail(error);
+    throw error;
   }
-  return client;
 }
 
 export function createWorkerProfileRuntime(options: WorkerProfileOptions): ProfileRuntimeFactory {

@@ -40,4 +40,6 @@ smoke 会预加载确定性的 `env` stub，使用 Wasmtime 提供 WASI Preview 
 
 Dedicated Worker 隔离让主页面能够报告 `abort()`、`RangeError` 等 JavaScript 可见的软失败，但不能保护 iOS 页面免受内存不足终止：WebKit 的 Worker 与页面运行在同一个 WebContent 进程内，Jetsam 会终止整个进程。页面重新载入后，未完成尝试标记只能说明上次尝试没有完成，不能证明具体原因。
 
+`ArtifactLoadAttemptTracker` 为完整 profile 加载提供这项启发式记录。将它作为 `loadAttempt` 传给 `createWorkerProfileRuntime` 后，加载流程会记录 `fetching`、`compiling`、`instantiating` 和 `ready`；加载成功或进入可捕获失败时，会清除活动标记并另存结果。应用重新载入后可通过 `unfinished()` 提示“上次加载完整功能未能完成”，但不能断言原因。真机测量页的内存上限候选也复用同一个记录器。
+
 共享输入不会 detach，`requestShared()` 可把输出物化为 `SharedArrayBuffer`。即使使用共享内存，wasm 线性内存到宿主共享缓冲之间仍有一次必要复制。浏览器使用这些能力需要 cross-origin isolation。

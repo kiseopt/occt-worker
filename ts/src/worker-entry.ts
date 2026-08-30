@@ -21,7 +21,10 @@ self.addEventListener("message", async (event) => {
   };
   if (message.type === "init") {
     try {
-      client = await DirectClient.create(message.wasm!, {}, {
+      self.postMessage({ type: "init-progress", stage: "compiling" });
+      const module = await WebAssembly.compile(message.wasm!);
+      self.postMessage({ type: "init-progress", stage: "instantiating" });
+      client = await DirectClient.create(module, {}, {
         isCancelled: () => activeCall?.cancelFlag !== undefined
           && Atomics.load(activeCall.cancelFlag, 0) !== 0,
         onProgress: (fraction) => {

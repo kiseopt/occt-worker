@@ -9,7 +9,7 @@ self.addEventListener("message", async (event) => {
       throw new Error(`Unknown memory candidate '${candidateMb}'`);
     }
     if (mode === "limit") {
-      self.postMessage({ type: "limit-progress", stage: "加载候选产物" });
+      self.postMessage({ type: "limit-progress", stage: "加载候选产物", attemptStage: "fetching" });
     }
 
     const stepName = mode === "long-run" ? "linkrods.step" : "screw.step";
@@ -21,6 +21,9 @@ self.addEventListener("message", async (event) => {
     const wasmUrl = mode === "limit"
       ? new URL(`./candidates/${candidateMb}/${profile}.wasm`, self.location.href)
       : new URL(`../../artifacts/${profile}.wasm`, self.location.href);
+    if (mode === "limit") {
+      self.postMessage({ type: "limit-progress", stage: "编译候选产物", attemptStage: "compiling" });
+    }
     const compileStarted = performance.now();
     const module = await WebAssembly.compileStreaming(fetch(wasmUrl, { cache: "no-store" }));
     const compileMs = performance.now() - compileStarted;
@@ -68,6 +71,9 @@ self.addEventListener("message", async (event) => {
     const wasi = new Proxy(stubs, {
       get: (target, property) => (property in target ? target[property] : () => 0),
     });
+    if (mode === "limit") {
+      self.postMessage({ type: "limit-progress", stage: "实例化候选产物", attemptStage: "instantiating" });
+    }
     const instance = await WebAssembly.instantiate(module, { wasi_snapshot_preview1: wasi, env: wasi });
     const exports = instance.exports;
     memory = exports.memory;
@@ -85,6 +91,7 @@ self.addEventListener("message", async (event) => {
       self.postMessage({
         type: "limit-progress",
         stage: "执行典型负载",
+        attemptStage: "ready",
         memoryMb: memory.buffer.byteLength / MEBIBYTE,
       });
     }
@@ -228,6 +235,7 @@ self.addEventListener("message", async (event) => {
         self.postMessage({
           type: "limit-progress",
           stage: "增长并写满 wasm 线性内存",
+          attemptStage: "growing",
           memoryMb: memory.buffer.byteLength / MEBIBYTE,
         });
         await new Promise((resolve) => setTimeout(resolve, 50));

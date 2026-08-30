@@ -1,3 +1,5 @@
+import { ArtifactLoadAttemptTracker } from "../../dist/artifact-load-attempt.js";
+
 const RUN_COUNT = 3;
 const workerUrl = new URL("./measure-worker.mjs", import.meta.url);
 const status = document.querySelector("#status");
@@ -15,7 +17,10 @@ const limitStatus = document.querySelector("#limit-status");
 const limitReport = document.querySelector("#limit-report");
 const copyLimitButton = document.querySelector("#copy-limit-results");
 const results = { preview: undefined, full: undefined };
-const limitAttemptKey = "occt-worker-device-limit-attempt";
+const limitAttempts = new ArtifactLoadAttemptTracker(localStorage, {
+  attemptKey: "occt-worker-device-limit-attempt",
+  resultKey: "occt-worker-device-limit-result",
+});
 let limitResult;
 
 const rows = [
@@ -276,7 +281,7 @@ function renderLimitResult() {
 
 function storeLimitResult(value) {
   limitResult = value;
-  localStorage.setItem(limitAttemptKey, JSON.stringify({ ...value, status: value.outcome }));
+  limitAttempts.complete({ ...value, status: value.outcome });
   renderLimitResult();
 }
 
@@ -307,6 +312,7 @@ function runLimitWorker(profile, candidateMb) {
       resetHeartbeat();
       if (event.data.type === "limit-progress") {
         lastMemoryMb = event.data.memoryMb;
+        if (event.data.attemptStage !== undefined) limitAttempts.update(event.data.attemptStage);
         limitStatus.textContent = `${profile} / ${candidateMb} MiB: ${event.data.stage}${lastMemoryMb === undefined ? "" : ` (${formatNumber(lastMemoryMb)} MB)`}`;
         return;
       }
@@ -337,11 +343,7 @@ async function runLimitTest() {
   const [profile, candidateMbText] = limitCandidate.value.split(":");
   const candidateMb = Number(candidateMbText);
   const candidate = `${profile}-${candidateMb}`;
-  localStorage.setItem(limitAttemptKey, JSON.stringify({
-    status: "running",
-    candidate,
-    device: device.value.trim(),
-  }));
+  limitAttempts.begin(candidate, "fetching", { device: device.value.trim() });
   limitResult = undefined;
   renderLimitResult();
   limitStatus.dataset.state = "running";
@@ -380,23 +382,24 @@ async function copyLimitResults() {
 }
 
 try {
-  const previous = JSON.parse(localStorage.getItem(limitAttemptKey) ?? "null");
-  if (previous?.status === "running") {
+  const previousAttempt = limitAttempts.unfinished();
+  const previousResult = limitAttempts.lastResult();
+  if (previousAttempt !== undefined) {
     storeLimitResult({
-      candidate: previous.candidate,
-      device: previous.device,
+      candidate: previousAttempt.subject,
+      device: previousAttempt.device,
       outcome: "incomplete",
-      detail: "上次尝试未完成；请结合测试时是否出现白屏或页面重载判断",
+      detail: `上次尝试未完成（阶段：${previousAttempt.stage}）；请结合测试时是否出现白屏或页面重载判断`,
     });
     limitStatus.dataset.state = "error";
     limitStatus.textContent = "上次尝试未完成";
-  } else if (previous?.candidate !== undefined) {
+  } else if (previousResult?.candidate !== undefined) {
     limitResult = {
-      candidate: previous.candidate,
-      device: previous.device,
-      outcome: previous.outcome ?? previous.status,
-      memoryMb: previous.memoryMb,
-      detail: previous.detail,
+      candidate: previousResult.candidate,
+      device: previousResult.device,
+      outcome: previousResult.outcome ?? previousResult.status,
+      memoryMb: previousResult.memoryMb,
+      detail: previousResult.detail,
     };
     renderLimitResult();
     limitStatus.dataset.state = limitResult.outcome === "range-error" ? "complete" : "error";

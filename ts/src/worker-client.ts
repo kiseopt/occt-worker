@@ -16,6 +16,12 @@ interface WorkerLike {
   addEventListener(type: "error", listener: (event: ErrorEvent) => void): void;
 }
 
+export type WorkerInitializationStage = "compiling" | "instantiating" | "ready";
+
+export interface WorkerClientOptions {
+  onInitializationStage?(stage: WorkerInitializationStage): void;
+}
+
 interface QueuedCall {
   id: number;
   op: OperationName;
@@ -38,6 +44,7 @@ const cooperativeOperations = new Set<OperationName>(COOPERATIVE_OPERATIONS);
 export class WorkerClient extends BaseClient {
   readonly #factory: () => WorkerLike;
   readonly #wasm: ArrayBuffer;
+  readonly #options: WorkerClientOptions;
   #worker: WorkerLike | undefined;
   #ready!: Promise<void>;
   #rejectReady: ((reason: unknown) => void) | undefined;
@@ -47,15 +54,20 @@ export class WorkerClient extends BaseClient {
   #active: QueuedCall | undefined;
   #queue: QueuedCall[] = [];
 
-  private constructor(factory: () => WorkerLike, wasm: ArrayBuffer) {
+  private constructor(factory: () => WorkerLike, wasm: ArrayBuffer, options: WorkerClientOptions) {
     super();
     this.#factory = factory;
     this.#wasm = wasm;
+    this.#options = options;
     this.#startWorker();
   }
 
-  static async create(factory: () => WorkerLike, wasm: ArrayBuffer): Promise<WorkerClient> {
-    const client = new WorkerClient(factory, wasm);
+  static async create(
+    factory: () => WorkerLike,
+    wasm: ArrayBuffer,
+    options: WorkerClientOptions = {},
+  ): Promise<WorkerClient> {
+    const client = new WorkerClient(factory, wasm, options);
     try {
       await client.#ready;
       await client.initialize();
@@ -169,10 +181,16 @@ export class WorkerClient extends BaseClient {
           result?: unknown;
           error?: KernelErrorData;
           fraction?: number;
+          stage?: WorkerInitializationStage;
         };
+        if (message.type === "init-progress" && message.stage !== undefined) {
+          this.#options.onInitializationStage?.(message.stage);
+          return;
+        }
         if (message.type === "ready") {
           this.#isReady = true;
           this.#rejectReady = undefined;
+          this.#options.onInitializationStage?.("ready");
           resolve();
           this.#dispatchNext();
           return;

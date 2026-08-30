@@ -11,6 +11,7 @@ export * from "./engine-compat.js";
 export * from "./shared-loader.js";
 export * from "./shared-client.js";
 export * from "./artifact-resolver.js";
+export * from "./artifact-load-attempt.js";
 export * from "./isolated-runtime.js";
 export * from "./profile-clients.generated.js";
 export * from "./single-runtime-session.js";

@@ -70,12 +70,26 @@ try {
   assert.equal(memoryResult.baseline.liveBufferBytes, 0);
   assert.equal(memoryResult.postWarmupStable, true);
 
+  const attemptPage = await browser.newPage();
+  const attemptUrl = `http://127.0.0.1:${address.port}/tests/browser/artifact-load-attempt.html`;
+  for (const mode of ["success", "failure", "reload"]) {
+    await attemptPage.goto(`${attemptUrl}?mode=${mode}`);
+    const attemptResult = attemptPage.locator("#result");
+    await attemptPage.waitForFunction(
+      () => document.querySelector("#result")?.dataset.state !== "running",
+      undefined,
+      { timeout: 120000 },
+    );
+    assert.equal(await attemptResult.getAttribute("data-state"), "passed", await attemptResult.textContent());
+  }
+
   console.log(JSON.stringify({
     browser: browserName,
     triangles: value.triangles,
     workerSoftFailure: true,
     longRunRounds: memoryResult.rounds,
     longRunLinearMemoryMb: memoryResult.wasmLinearMemoryCapacityMbByRound,
+    fullLoadAttemptStates: ["success", "failure", "reload"],
   }));
 } finally {
   await browser.close();
