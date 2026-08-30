@@ -69,7 +69,7 @@
   },
   "scripts": {
     "bootstrap:sources": "node scripts/bootstrap-sources.mjs",
-    "generate": "node scripts/generate-protocol.mjs",
+    "generate": "node scripts/generate-profiles.mjs && node scripts/generate-protocol.mjs",
     "build": "npm run generate && tsc -p tsconfig.json",
     "prepack": "npm run build && node scripts/verify-wasm.mjs --quiet",
     "prepublishOnly": "npm test && npm run test:browser:all && npm run test:package",

@@ -112,38 +112,124 @@
       "importIGESDocument", "exportIGESDocument", "importXCAF", "exportXCAF"
     ]
   },
-  "artifactModuleCandidates": {
-    "geometry-topology.side.wasm": ["geometry-topology"],
-    "topology-query.side.wasm": ["topology-query"],
-    "modeling.side.wasm": ["modeling"],
-    "algorithms.side.wasm": ["algorithms"],
-    "tessellation.side.wasm": ["tessellation"],
-    "mesh.side.wasm": ["mesh"],
-    "exchange-mesh.side.wasm": ["exchange-mesh"],
-    "step-shape-exchange.side.wasm": ["step-shape-exchange"],
-    "cad-document-exchange.side.wasm": ["cad-document-exchange"]
+  "implementationUnits": {
+    "runtime": {
+      "modules": ["runtime"],
+      "sources": [
+        "runtime/kernel.cpp", "runtime/dispatch.cpp", "runtime/shape_arena.cpp", "runtime/buffer_store.cpp",
+        "runtime/protocol_helpers.cpp", "runtime/geometry_helpers.cpp", "runtime/history_helpers.cpp",
+        "runtime/exchange_cad_helpers.cpp", "runtime/operation_registry.cpp", "runtime/protocol_dispatch.cpp",
+        "runtime/protocol_bridge.cpp", "runtime/shape_transfer.cpp", "entry/full_entry.cpp"
+      ],
+      "toolkits": [
+        "TKBinXCAF", "TKXmlXCAF", "TKBin", "TKBinL", "TKXml", "TKXmlL", "TKDEVRML", "TKRWMesh",
+        "TKV3d", "TKService", "TKXCAF", "TKLCAF", "TKCAF", "TKCDF", "TKHLR", "TKDESTL", "TKDEIGES",
+        "TKDESTEP", "TKXSBase", "TKDE", "TKFeat", "TKOffset", "TKFillet", "TKBO", "TKBool", "TKPrim",
+        "TKMesh", "TKShHealing", "TKTopAlgo", "TKGeomAlgo", "TKBRep", "TKGeomBase", "TKG3d", "TKG2d",
+        "TKMath", "TKernel"
+      ],
+      "requires": []
+    },
+    "geometry-topology": {
+      "modules": ["geometry-topology"],
+      "artifact": "geometry-topology.side.wasm",
+      "sources": [
+        "operations/geometry_topology.cpp", "operations/geometry_curves.cpp",
+        "operations/geometry_approximation.cpp", "operations/geometry_surfaces.cpp",
+        "operations/geometry_surface_sweeps.cpp", "operations/geometry_surface_edits.cpp",
+        "operations/topology.cpp", "operations/geometry_analysis.cpp"
+      ],
+      "toolkits": [],
+      "requires": ["runtime"]
+    },
+    "topology-query": {
+      "modules": ["topology-query"],
+      "artifact": "topology-query.side.wasm",
+      "sources": ["operations/topology_query.cpp"],
+      "toolkits": [],
+      "requires": ["runtime"]
+    },
+    "modeling": {
+      "modules": ["modeling"],
+      "artifact": "modeling.side.wasm",
+      "sources": ["operations/modeling.cpp", "operations/modeling_fillet.cpp", "operations/modeling_transform.cpp"],
+      "toolkits": [],
+      "requires": ["runtime"]
+    },
+    "algorithms": {
+      "modules": ["algorithms"],
+      "artifact": "algorithms.side.wasm",
+      "sources": ["operations/algorithms.cpp", "operations/analysis_algorithms.cpp", "operations/shape_upgrade.cpp"],
+      "toolkits": [],
+      "requires": ["runtime"]
+    },
+    "tessellation": {
+      "modules": ["tessellation"],
+      "artifact": "tessellation.side.wasm",
+      "sources": ["operations/tessellation.cpp"],
+      "toolkits": [],
+      "requires": ["runtime"]
+    },
+    "mesh": {
+      "modules": ["mesh"],
+      "artifact": "mesh.side.wasm",
+      "sources": ["operations/mesh.cpp"],
+      "toolkits": [],
+      "requires": ["runtime"]
+    },
+    "exchange-mesh": {
+      "modules": ["exchange-mesh"],
+      "artifact": "exchange-mesh.side.wasm",
+      "sources": [
+        "operations/exchange_mesh.cpp", "operations/exchange_obj_ply_gltf.cpp",
+        "runtime/document_dispatch.cpp", "runtime/mesh_codecs.cpp", "runtime/obj_ply_codecs.cpp",
+        "runtime/obj_ply_writers.cpp", "runtime/gltf_codecs.cpp", "runtime/gltf_animation.cpp",
+        "runtime/gltf_import.cpp"
+      ],
+      "toolkits": [],
+      "requires": ["runtime"]
+    },
+    "step-shape-exchange": {
+      "modules": ["step-shape-exchange"],
+      "artifact": "step-shape-exchange.side.wasm",
+      "sources": ["operations/exchange_cad.cpp", "operations/exchange_step.cpp", "operations/exchange_probe.cpp"],
+      "toolkits": [],
+      "requires": ["runtime"]
+    },
+    "cad-document-exchange": {
+      "modules": ["cad-document-exchange"],
+      "artifact": "cad-document-exchange.side.wasm",
+      "sources": [
+        "operations/cad_document_exchange.cpp", "operations/exchange_document_export.cpp",
+        "operations/exchange_document_writers.cpp", "operations/exchange_document_nodes.cpp",
+        "operations/exchange_document_annotations.cpp", "operations/exchange_document_import.cpp",
+        "operations/exchange_iges.cpp"
+      ],
+      "toolkits": [],
+      "requires": ["runtime"]
+    }
   },
   "profiles": {
     "core-modeling": {
       "artifact": "core-modeling.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm"]
+      "units": ["geometry-topology", "topology-query", "modeling", "algorithms"]
     },
     "mesh": {
       "artifact": "mesh.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "tessellation.side.wasm", "mesh.side.wasm"]
+      "units": ["geometry-topology", "topology-query", "modeling", "algorithms", "tessellation", "mesh"]
     },
     "exchange": {
       "artifact": "exchange.wasm",
-      "artifacts": ["step-shape-exchange.side.wasm", "cad-document-exchange.side.wasm", "exchange-mesh.side.wasm"]
+      "units": ["step-shape-exchange", "cad-document-exchange", "exchange-mesh"]
     },
     "preview": {
       "artifact": "preview.wasm",
-      "artifacts": ["topology-query.side.wasm", "tessellation.side.wasm", "step-shape-exchange.side.wasm"]
+      "units": ["topology-query", "tessellation", "step-shape-exchange"]
     },
     "modeling-viewer": { "aliasOf": "mesh" },
     "full-profile": {
       "artifact": "full.wasm",
-      "artifacts": ["geometry-topology.side.wasm", "topology-query.side.wasm", "modeling.side.wasm", "algorithms.side.wasm", "tessellation.side.wasm", "mesh.side.wasm", "exchange-mesh.side.wasm", "step-shape-exchange.side.wasm", "cad-document-exchange.side.wasm"]
+      "units": ["geometry-topology", "topology-query", "modeling", "algorithms", "tessellation", "mesh", "exchange-mesh", "step-shape-exchange", "cad-document-exchange"]
     }
   }
 }

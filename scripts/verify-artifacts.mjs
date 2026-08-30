@@ -19,7 +19,7 @@ if (releaseBaseIndex !== -1 && (releaseBaseUrl === undefined || !releaseBaseUrl.
 const manifestUrl = new URL("protocol/artifacts.json", root);
 const [manifest, modules, errors] = await Promise.all([
   readFile(manifestUrl, "utf8").then(JSON.parse),
-  readFile(new URL("protocol/modules.json", root), "utf8").then(JSON.parse),
+  readFile(new URL("scripts/profile-topology.generated.json", root), "utf8").then(JSON.parse),
   readFile(new URL("protocol/errors.json", root), "utf8").then(JSON.parse),
 ]);
 
@@ -43,9 +43,9 @@ const expectedArtifacts = new Map([
     name,
     { kind: "shared-side", buildFamily: manifest.buildFamilies?.shared, semanticModules },
   ]),
-  ...Object.entries(modules.profiles ?? {}).filter(([, definition]) => definition.aliasOf === undefined).map(([profile, definition]) => [
-    definition.artifact,
-    { kind: "isolated-profile", buildFamily: manifest.buildFamilies?.isolated, profile },
+  ...(modules.buildProfiles ?? []).map(({ id, artifact }) => [
+    artifact,
+    { kind: "isolated-profile", buildFamily: manifest.buildFamilies?.isolated, profile: id },
   ]),
 ]);
 for (const name of expectedArtifacts.keys()) {

@@ -1,0 +1,25 @@
+{
+  "generatedFrom": "protocol/modules.json",
+  "profiles": {
+    "core-modeling": {
+      "artifact": "core-modeling.wasm",
+      "sizeBytes": 18268899
+    },
+    "mesh": {
+      "artifact": "mesh.wasm",
+      "sizeBytes": 18722873
+    },
+    "exchange": {
+      "artifact": "exchange.wasm",
+      "sizeBytes": 15788060
+    },
+    "preview": {
+      "artifact": "preview.wasm",
+      "sizeBytes": 11045697
+    },
+    "full-profile": {
+      "artifact": "full.wasm",
+      "sizeBytes": 27586726
+    }
+  }
+}

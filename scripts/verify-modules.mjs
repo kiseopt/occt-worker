@@ -73,32 +73,60 @@ for (const [operation, dispatch] of Object.entries(policies.documentDispatch ?? 
     `document dispatch for '${operation}' has unknown kind '${dispatch.kind}'`);
 }
 
-// 3. Artifact candidates cover every non-runtime module exactly once.
-const candidates = modulesDoc.artifactModuleCandidates ?? {};
-const candidateNames = Object.keys(candidates);
-check(candidateNames.length > 0, "artifactModuleCandidates must not be empty");
-{
-  const assigned = new Map();
-  for (const [artifact, mods] of Object.entries(candidates)) {
-    check(Array.isArray(mods) && mods.length >= 1, `artifact candidate '${artifact}' must reference at least one semantic module`);
-    for (const mod of mods) {
-      check(mod in semanticModules, `artifact candidate '${artifact}' references unknown semantic module '${mod}'`);
-      if (assigned.has(mod)) {
-        errors.push(`semantic module '${mod}' is claimed by both '${assigned.get(mod)}' and '${artifact}'`);
-      } else {
-        assigned.set(mod, artifact);
-      }
+// 3. Implementation units own sources/toolkits and form an acyclic dependency graph.
+const units = modulesDoc.implementationUnits ?? {};
+check(Object.keys(units).length > 0, "implementationUnits must not be empty");
+const moduleOwners = new Map();
+const candidates = {};
+for (const [unitId, unit] of Object.entries(units)) {
+  for (const field of ["modules", "sources", "toolkits", "requires"]) {
+    check(Array.isArray(unit[field]) && unit[field].every((value) => typeof value === "string"),
+      `implementation unit '${unitId}' ${field} must be an array of strings`);
+    check(new Set(unit[field] ?? []).size === (unit[field] ?? []).length,
+      `implementation unit '${unitId}' ${field} must not contain duplicates`);
+  }
+  check((unit.modules ?? []).length > 0, `implementation unit '${unitId}' must own at least one semantic module`);
+  for (const moduleName of unit.modules ?? []) {
+    check(moduleName in semanticModules, `implementation unit '${unitId}' references unknown semantic module '${moduleName}'`);
+    if (moduleOwners.has(moduleName)) {
+      errors.push(`semantic module '${moduleName}' is claimed by both '${moduleOwners.get(moduleName)}' and '${unitId}'`);
+    } else {
+      moduleOwners.set(moduleName, unitId);
+    }
+    if (unit.artifact !== undefined) {
+      const assigned = candidates[unit.artifact] ?? [];
+      if (!assigned.includes(moduleName)) assigned.push(moduleName);
+      candidates[unit.artifact] = assigned;
     }
   }
-  for (const moduleName of Object.keys(semanticModules)) {
-    if (moduleName === "runtime") continue;
-    if (!assigned.has(moduleName)) {
-      errors.push(`semantic module '${moduleName}' is not covered by any artifact candidate`);
-    }
+  check(unit.artifact === undefined || (typeof unit.artifact === "string" && unit.artifact.endsWith(".side.wasm")),
+    `implementation unit '${unitId}' must name a .side.wasm artifact`);
+  for (const dependency of unit.requires ?? []) {
+    check(dependency in units, `implementation unit '${unitId}' requires unknown unit '${dependency}'`);
   }
 }
+for (const moduleName of Object.keys(semanticModules)) {
+  check(moduleOwners.has(moduleName), `semantic module '${moduleName}' is not covered by any implementation unit`);
+}
 
-// 4. Profiles derive capabilities from artifacts; runtime is always present.
+const closureCache = new Map();
+const unitClosure = (unitId, stack = []) => {
+  if (closureCache.has(unitId)) return closureCache.get(unitId);
+  if (stack.includes(unitId)) {
+    errors.push(`implementation unit dependency cycle: ${[...stack, unitId].join(" -> ")}`);
+    return [];
+  }
+  const result = [];
+  for (const dependency of units[unitId]?.requires ?? []) {
+    for (const member of unitClosure(dependency, [...stack, unitId])) if (!result.includes(member)) result.push(member);
+  }
+  if (!result.includes(unitId)) result.push(unitId);
+  closureCache.set(unitId, result);
+  return result;
+};
+for (const unitId of Object.keys(units)) unitClosure(unitId);
+
+// 4. Profiles derive capabilities from their complete implementation-unit closure.
 const profiles = modulesDoc.profiles ?? {};
 check(Object.keys(profiles).length > 0, "profiles must not be empty");
 const profileOps = {};
@@ -121,19 +149,20 @@ for (const [profileId, profile] of Object.entries(profiles)) {
     check(!profileArtifacts.has(resolved.artifact), `standalone artifact '${resolved.artifact}' is assigned to more than one profile`);
     profileArtifacts.add(resolved.artifact);
   }
-  const artifacts = resolved.artifacts ?? [];
-  check(Array.isArray(artifacts) && artifacts.length > 0, `profile '${profileId}' must list at least one artifact`);
-  const seenArtifacts = new Set();
+  const declaredUnits = resolved.units ?? [];
+  check(Array.isArray(declaredUnits) && declaredUnits.length > 0, `profile '${profileId}' must list at least one implementation unit`);
+  check(new Set(declaredUnits).size === declaredUnits.length, `profile '${profileId}' must not list an implementation unit more than once`);
+  const closure = [];
+  for (const unitId of declaredUnits) {
+    check(unitId in units, `profile '${profileId}' references unknown implementation unit '${unitId}'`);
+    for (const member of unitClosure(unitId)) if (!closure.includes(member)) closure.push(member);
+  }
   const derived = new Set();
-  for (const artifact of artifacts) {
-    check(!seenArtifacts.has(artifact), `profile '${profileId}' lists artifact '${artifact}' more than once`);
-    seenArtifacts.add(artifact);
-    check(artifact in candidates, `profile '${profileId}' references unknown artifact '${artifact}'`);
-    for (const mod of candidates[artifact] ?? []) {
-      for (const op of semanticModules[mod] ?? []) derived.add(op);
+  for (const unitId of closure) {
+    for (const moduleName of units[unitId]?.modules ?? []) {
+      for (const op of semanticModules[moduleName] ?? []) derived.add(op);
     }
   }
-  for (const op of semanticModules.runtime ?? []) derived.add(op);
   for (const op of modulesDoc.transferOperations ?? []) derived.add(op);
   profileOps[profileId] = derived;
 }
@@ -165,7 +194,8 @@ if (!quiet) {
   console.log(JSON.stringify({
     operations: catalog.length,
     semanticModules: actualCounts,
-    artifactCandidates: candidateNames,
+    implementationUnits: Object.keys(units),
+    artifactCandidates: Object.keys(candidates),
     profiles: Object.fromEntries(Object.entries(profileOps).map(([id, set]) => [id, set.size])),
   }, null, 2));
 }

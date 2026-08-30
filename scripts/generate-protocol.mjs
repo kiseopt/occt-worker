@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 const source = JSON.parse(await readFile(new URL("../protocol/errors.json", import.meta.url), "utf8"));
 const operations = JSON.parse(await readFile(new URL("../protocol/operations.json", import.meta.url), "utf8"));
 const contracts = JSON.parse(await readFile(new URL("../protocol/operation-contracts.json", import.meta.url), "utf8"));
-const modules = JSON.parse(await readFile(new URL("../protocol/modules.json", import.meta.url), "utf8"));
+const modules = JSON.parse(await readFile(new URL("profile-topology.generated.json", import.meta.url), "utf8"));
 const artifacts = JSON.parse(await readFile(new URL("../protocol/artifacts.json", import.meta.url), "utf8"));
 const buildFlags = JSON.parse(await readFile(new URL("../protocol/build-flags.json", import.meta.url), "utf8"));
 const occtSource = artifacts.sources?.occt;
