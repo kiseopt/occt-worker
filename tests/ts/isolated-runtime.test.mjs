@@ -4,7 +4,7 @@ import { Worker } from "node:worker_threads";
 import test from "node:test";
 import { GeometryEngine } from "../../dist/engine.js";
 import { createWorkerProfileRuntime } from "../../dist/isolated-runtime.js";
-import { PROFILE_OPERATIONS, RUNTIME_CONFIG } from "../../dist/index.js";
+import { BUILD_IDENTITY, PROFILE_OPERATIONS, RUNTIME_CONFIG } from "../../dist/index.js";
 
 function createNodeWorker() {
   const worker = new Worker(new URL("./node-worker.mjs", import.meta.url));
@@ -121,6 +121,75 @@ test("modeling-viewer profile loads and runs the mesh artifact", async () => {
   } finally {
     await engine.close();
   }
+});
+
+test("custom artifact URL loads the real full wasm and reports capabilities", async () => {
+  const official = RUNTIME_CONFIG.profiles["full-profile"].artifact;
+  let resolvedUrl;
+  const runtimeFactory = createWorkerProfileRuntime({
+    artifact: {
+      name: "vendor-full.wasm",
+      sha256: official.sha256,
+      protocolVersion: BUILD_IDENTITY.protocolVersion,
+      abiVersion: BUILD_IDENTITY.pluginAbiVersion,
+      buildFamily: BUILD_IDENTITY.buildFamilies.isolated,
+    },
+    resolve: () => {
+      resolvedUrl = new URL("../../artifacts/full.wasm", import.meta.url);
+      return resolvedUrl;
+    },
+    createWorker: createNodeWorker,
+    loadArtifact: (url) => readFile(new URL(url))
+      .then((bytes) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
+  });
+
+  const runtime = await runtimeFactory();
+  try {
+    const capabilities = await runtime.request("capabilities", {});
+    assert.equal(capabilities.protocolVersion, BUILD_IDENTITY.protocolVersion);
+    assert.ok(capabilities.ops.includes("makeBox"));
+    assert.ok(capabilities.ops.includes("importSTEP"));
+  } finally {
+    await runtime.close();
+  }
+  assert.match(resolvedUrl.href, /artifacts\/full\.wasm$/);
+});
+
+test("custom artifact descriptor rejects declared identity mismatches", async () => {
+  const cases = [
+    ["protocolVersion", "0.0.0", /declares protocol version/],
+    ["abiVersion", BUILD_IDENTITY.pluginAbiVersion + 1, /declares ABI version/],
+    ["buildFamily", "vendor-family", /declares build family/],
+  ];
+  let workerCreated = false;
+  for (const [field, value, message] of cases) {
+    const runtimeFactory = createWorkerProfileRuntime({
+      artifact: { name: `invalid-${field}.wasm`, [field]: value },
+      resolve: () => "https://example.test/custom.wasm",
+      createWorker: () => {
+        workerCreated = true;
+        return createCapabilityWorker([]);
+      },
+      loadArtifact: async () => new ArrayBuffer(0),
+    });
+    await assert.rejects(runtimeFactory(), message);
+  }
+  assert.equal(workerCreated, false);
+});
+
+test("custom artifact descriptor verifies supplied hash before starting a worker", async () => {
+  let workerCreated = false;
+  const runtimeFactory = createWorkerProfileRuntime({
+    artifact: { name: "invalid-hash.wasm", sha256: "00".repeat(32) },
+    resolve: () => "https://example.test/custom.wasm",
+    createWorker: () => {
+      workerCreated = true;
+      return createCapabilityWorker([]);
+    },
+    loadArtifact: async () => new TextEncoder().encode("not wasm").buffer,
+  });
+  await assert.rejects(runtimeFactory(), /SHA-256 mismatch/);
+  assert.equal(workerCreated, false);
 });
 
 test("real isolated profile workers support clone transfer and source survival", async () => {

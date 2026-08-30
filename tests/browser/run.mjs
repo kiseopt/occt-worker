@@ -89,6 +89,16 @@ try {
   await cachePage.waitForFunction(() => document.querySelector("#result")?.dataset.state !== "running");
   assert.equal(await cacheResult.getAttribute("data-state"), "passed", await cacheResult.textContent());
 
+  const customArtifactPage = await browser.newPage();
+  await customArtifactPage.goto(`http://127.0.0.1:${address.port}/tests/browser/custom-artifact.html`);
+  const customArtifactResult = customArtifactPage.locator("#result");
+  await customArtifactPage.waitForFunction(() => document.querySelector("#result")?.dataset.state !== "running");
+  assert.equal(
+    await customArtifactResult.getAttribute("data-state"),
+    "passed",
+    await customArtifactResult.textContent(),
+  );
+
   console.log(JSON.stringify({
     browser: browserName,
     triangles: value.triangles,
@@ -97,6 +107,7 @@ try {
     longRunLinearMemoryMb: memoryResult.wasmLinearMemoryCapacityMbByRound,
     fullLoadAttemptStates: ["success", "failure", "reload"],
     artifactByteCache: true,
+    customArtifact: true,
   }));
 } finally {
   await browser.close();

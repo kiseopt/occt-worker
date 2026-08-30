@@ -1,6 +1,7 @@
 import { WorkerClient } from "./worker-client.js";
 import type { ArtifactLoadAttemptTracker } from "./artifact-load-attempt.js";
 import { assertOperationSet } from "./capability-assertion.js";
+import { BUILD_IDENTITY } from "./build-identity.generated.js";
 import type { ProfileRuntime, ProfileRuntimeFactory } from "./engine.js";
 import type { OperationName } from "./generated.js";
 import { PROFILE_OPERATIONS, type ProfileClientMap } from "./profile-clients.generated.js";
@@ -28,12 +29,29 @@ export type WorkerProfileOptions = WorkerProfileHostOptions & (
 );
 
 async function createWorkerClient(options: WorkerProfileOptions): Promise<WorkerClient> {
-  const artifact = options.profile === undefined
+  const artifact: ArtifactDescriptor = options.profile === undefined
     ? options.artifact
     : RUNTIME_CONFIG.profiles[options.profile].artifact;
   options.loadAttempt?.begin(artifact.name, "fetching");
   options.onLoadStage?.("fetching");
   try {
+    if (options.profile === undefined) {
+      if (artifact.protocolVersion !== undefined && artifact.protocolVersion !== BUILD_IDENTITY.protocolVersion) {
+        throw new Error(
+          `artifact '${artifact.name}' declares protocol version '${artifact.protocolVersion}'; client requires '${BUILD_IDENTITY.protocolVersion}'`,
+        );
+      }
+      if (artifact.abiVersion !== undefined && artifact.abiVersion !== BUILD_IDENTITY.pluginAbiVersion) {
+        throw new Error(
+          `artifact '${artifact.name}' declares ABI version ${artifact.abiVersion}; isolated profiles require ${BUILD_IDENTITY.pluginAbiVersion}`,
+        );
+      }
+      if (artifact.buildFamily !== undefined && artifact.buildFamily !== BUILD_IDENTITY.buildFamilies.isolated) {
+        throw new Error(
+          `artifact '${artifact.name}' declares build family '${artifact.buildFamily}'; isolated profiles require '${BUILD_IDENTITY.buildFamilies.isolated}'`,
+        );
+      }
+    }
     const url = await resolveArtifact(artifact, options);
     const bytes = options.loadArtifact === undefined
       ? await loadArtifactBytes(artifact, url)

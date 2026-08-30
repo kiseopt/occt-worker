@@ -10,6 +10,21 @@ IGES XCAF document methods (`exportIGESDocument()` and `ShapeScope.importIGESDoc
 
 `beginScope()` returns a `ShapeScope`, which owns every shape it creates. End it explicitly or with `await using`. Shape handles carry a client epoch and cannot be constructed from raw numbers or sent to another or rebuilt kernel instance. `scope.batch()` is the typed batch entry point; it converts every top-level `shape` or `shapes` result into provenance-checked `ShapeHandle` values.
 
+### Custom isolated kernels
+
+To replace an isolated kernel, pass a custom `artifact` to
+`createWorkerProfileRuntime` and resolve it to the actual URL with `resolve` or
+`baseUrl`. The path still starts a Worker and performs the `capabilities`
+handshake, rejecting an incompatible protocol. When supplied, descriptor
+`sha256`, `protocolVersion`, `abiVersion`, and `buildFamily` are checked against
+the bytes or this client build; these fields are caller assertions, and
+`buildFamily` is not a runtime field that arbitrary wasm can self-certify.
+
+C3-generated profile client types apply only to the official profiles declared
+by `protocol/modules.json`. A custom artifact has no corresponding static
+capability narrowing; after loading it, read `runtime.request("capabilities", {})`
+and choose operations from the returned `ops`.
+
 Exchange options are exported named TypeScript contracts: `STLExportOptions`/`STLImportOptions`, `IGESExportOptions`/`IGESImportOptions`, `STEPExportOptions`/`STEPImportOptions`, `GLTFExportOptions`/`GLTFImportOptions`, `OBJExportOptions`/`OBJImportOptions`, `PLYExportOptions`/`PLYImportOptions`, and `VRMLExportOptions`/`VRMLImportOptions`. Shape tessellation exporters share `TessellatedShapeExportOptions` (`linearDeflection`, `angularDeflection`, and `relative`); indexed mesh overloads accept `positions`/`indices` (STL also accepts normals; VRML also accepts normals/UVs) and ignore tessellation options, while mesh-document overloads accept only options meaningful without tessellation. `LengthUnit` is the common STEP/IGES unit union. Native XCAF defaults to binary when `format` is omitted at either the typed or low-level protocol entry point.
 
 Construction methods include primitives, vertices, polygon/wire/face/shell/solid/compound/compsolid construction, bounded plane/cylinder/cone/sphere/torus faces, wire-trimmed faces on existing surfaces, N-side filling surfaces with C0 boundaries and optional G1/G2 support-face constraints, finite line/arc/ellipse/hyperbola/parabola/offset/Bezier/BSpline/helix edges, finite extrusion/revolution/ruled/offset surfaces, point-set BSpline curve/surface approximation and bounded curve/surface extension, extrusion, revolution, loft, pipe sweeps, booleans, General Fuse cells with source-input mapping and take/avoid/material selection, multi-face draft angles, local prism and revolution-form rib/slot features, cylindrical holes, defeaturing, offsets, repair, and transforms. Method option types in `dist/client.d.ts` are the normative TypeScript signatures; operation names and history levels come from `protocol/operations.json`.

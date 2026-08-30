@@ -11,6 +11,19 @@
 - `stats()` 返回 `liveShapeHandles`、`liveBufferBytes` 和 `wasmMemorySize`。
 - `ShapeHandle` 携带客户端 epoch，不能伪造，也不能跨重建后的实例使用。
 
+### 自定义 isolated 内核
+
+需要替换内核时，可向 `createWorkerProfileRuntime` 传入自定义 `artifact`，并用
+`resolve` 或 `baseUrl` 将它解析到实际 URL。该路径仍会启动 Worker 并执行
+`capabilities` 握手，实际协议版本不兼容时会拒绝加载。descriptor 提供了
+`sha256`、`protocolVersion`、`abiVersion` 或 `buildFamily` 时，分别校验实际字节或
+声明的身份；这些字段都是调用方提供的断言，尤其 `buildFamily` 不是任意 wasm
+可以自行证明的运行时字段。
+
+C3 生成的 profile 客户端类型只对 `protocol/modules.json` 中的官方 profile 和其
+声明能力成立。自定义 artifact 没有相应的静态能力收窄，加载后应读取
+`runtime.request("capabilities", {})` 的实际 `ops`，再决定调用哪些操作。
+
 ## 基元与拓扑
 
 `ShapeScope` 提供 box、cylinder、sphere、cone、torus、wedge、half-space、vertex、polygon、wire、face、shell、solid、compound 和 compsolid。还提供按类型获取子形、邻接、形状类型、拓扑计数、相同形状判断和批处理。
