@@ -42,7 +42,8 @@ jobs:
       # Exact match only, no restore-keys: a near-miss would hand the link archives
       # built with different flags, and the artifact would still pass every later check.
       - name: Restore OCCT install
-        uses: actions/cache@v4
+        id: occt-cache
+        uses: actions/cache/restore@v4
         with:
           path: build/release/occt-install
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
@@ -64,6 +65,17 @@ jobs:
           path: vendor/emsdk/upstream/emscripten/cache
           key: ${{ runner.os }}-emsdk-sysroot-release-${{ steps.occt.outputs.key }}
       - run: npm run build:wasm
+      # Saved here rather than in a post step. A post step is skipped once any later
+      # step fails, which is how an 80-minute OCCT compile got discarded when the
+      # symbol-closure check failed after it. This runs while the build is still the
+      # last thing that happened, so the expensive tree is banked before anything
+      # cheap downstream can throw it away.
+      - name: Save OCCT install
+        if: steps.occt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/release/occt-install
+          key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
       - name: Verify pristine OCCT source
         shell: pwsh
         run: |
@@ -113,7 +125,8 @@ jobs:
         shell: pwsh
         run: node scripts/build-cache-key.mjs --variant=shared-pic --github | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - name: Restore PIC OCCT install
-        uses: actions/cache@v4
+        id: occt-cache
+        uses: actions/cache/restore@v4
         with:
           path: build/release/shared/occt-install-pic
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
@@ -128,6 +141,14 @@ jobs:
           path: vendor/emsdk/upstream/emscripten/cache
           key: ${{ runner.os }}-emsdk-sysroot-shared-${{ steps.occt.outputs.key }}
       - run: npm run build:wasm:shared
+      # Banked immediately; see the note in release-path. This is the exact tree whose
+      # 80-minute compile was lost to a later failure.
+      - name: Save PIC OCCT install
+        if: steps.occt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/release/shared/occt-install-pic
+          key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
       - name: Verify pristine OCCT source
         shell: pwsh
         run: |
@@ -137,8 +158,17 @@ jobs:
             throw 'OCCT source tree must be clean'
           }
       # Runs here rather than in verify: it reads only the Main and Side modules this
-      # job produces, so it needs no cross-job dependency to be correct.
-      - run: node scripts/verify-symbol-closure.mjs --main artifacts/shared-main.wasm --side artifacts/geometry-topology.side.wasm --side artifacts/modeling.side.wasm --side artifacts/algorithms.side.wasm --side artifacts/mesh.side.wasm --side artifacts/exchange-mesh.side.wasm --side artifacts/exchange-cad.side.wasm
+      # job produces, so it needs no cross-job dependency to be correct. The side list
+      # is derived from the generated topology rather than hardcoded -- a hardcoded list
+      # went stale when the topology grew to nine sides and renamed exchange-cad.
+      - name: Verify symbol closure
+        shell: pwsh
+        run: |
+          $topology = Get-Content -Raw scripts/profile-topology.generated.json | ConvertFrom-Json
+          $arguments = @('--main', 'artifacts/shared-main.wasm')
+          foreach ($side in $topology.sides) { $arguments += @('--side', "artifacts/$($side.artifact)") }
+          node scripts/verify-symbol-closure.mjs @arguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v6
         with:
           name: shared-path
@@ -163,7 +193,8 @@ jobs:
         shell: pwsh
         run: node scripts/build-cache-key.mjs --variant=debug --github | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - name: Restore OCCT install
-        uses: actions/cache@v4
+        id: occt-cache
+        uses: actions/cache/restore@v4
         with:
           path: build/debug/occt-install
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
@@ -175,6 +206,14 @@ jobs:
           path: vendor/emsdk/upstream/emscripten/cache
           key: ${{ runner.os }}-emsdk-sysroot-debug-${{ steps.occt.outputs.key }}
       - run: npm run build:wasm:debug
+      # Banked before test:debug runs, so a failing assertion smoke test does not
+      # discard the Debug OCCT tree. See the note in release-path.
+      - name: Save OCCT install
+        if: steps.occt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/debug/occt-install
+          key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
       - run: npm run test:debug
       - uses: actions/upload-artifact@v6
         with:
