@@ -262,6 +262,11 @@ jobs:
       # this job intentionally depends on release-path alone so it still runs on PRs.
       # On main the candidate job runs test:package against the actual tarball it
       # publishes; here it only needs to cover pull requests, which produce no candidate.
+      # tests/package/consumer.mjs launches chromium, so this job needs a browser even
+      # though it is not the browser job. In the old single-job workflow test:package
+      # ran after the playwright install step and inherited it.
+      - if: github.event_name == 'pull_request'
+        run: npx playwright install chromium
       - if: github.event_name == 'pull_request'
         run: npm run test:package
       # Benchmarks on a shared 4-core runner are too noisy to gate a PR on; they run as
@@ -362,6 +367,9 @@ jobs:
           "PACKAGE_TARBALL=$((Resolve-Path (Join-Path 'release-candidate' $pack.filename)).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PACKAGE_FILENAME=$($pack.filename)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PACKAGE_INTEGRITY=$($pack.integrity)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      # Same reason as the verify job: consumer.mjs launches chromium to exercise the
+      # packaged artifact in a browser.
+      - run: npx playwright install chromium
       - name: Test packed npm release
         shell: pwsh
         run: npm run test:package -- "--tarball=$env:PACKAGE_TARBALL"
