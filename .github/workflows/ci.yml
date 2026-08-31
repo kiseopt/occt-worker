@@ -189,7 +189,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
+      # Submodules are required even though this job builds nothing:
+      # tests/ts/step.test.mjs reads occt/data/step/screw.step from the OCCT submodule.
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -234,7 +238,11 @@ jobs:
         # only needs the first to catch a broken artifact.
         browser: ${{ github.event_name == 'pull_request' && fromJSON('["chromium"]') || fromJSON('["chromium","firefox","webkit"]') }}
     steps:
+      # Submodules are required: the device harness the browser suite drives fetches
+      # occt/data/step/{screw,linkrods}.step, which live in the OCCT submodule.
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v6
         with:
           node-version: 22
