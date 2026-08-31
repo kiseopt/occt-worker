@@ -249,6 +249,10 @@ jobs:
         with:
           name: shared-path
           path: artifacts
+      # Same reason as the browser job: the committed manifest's hashes come from a
+      # local build and cannot match CI-built artifacts. This job holds both families,
+      # so it regenerates the whole manifest rather than one family.
+      - run: node scripts/verify-artifacts.mjs --write
       - run: npm test
       - name: Verify source-generated files
         run: git diff --exit-code -- protocol/protocol.schema.json protocol/compatibility.snapshot.json ts/src/build-identity.generated.ts ts/src/generated.ts ts/src/protocol-types.generated.ts kernel/include/build_identity.generated.h kernel/include/generated.hpp
@@ -290,6 +294,12 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: release-path
+      # The committed manifest carries hashes from whatever machine last built locally,
+      # so it will not match a CI-built artifact. build:wasm:profiles rewrites it in
+      # place, but that happens on the release-path runner and is never uploaded, so
+      # regenerate it here against the files this job actually has. Same thing the old
+      # single-job workflow got for free by never leaving one workspace.
+      - run: node scripts/verify-artifacts.mjs --write --write-family isolated
       # tests/browser/*.mjs import ../../dist/index.js and dist/worker-entry.js, and
       # test:browser does not build. In the old single-job workflow npm test had already
       # produced dist/ earlier in the same job; this job has to build it itself.
