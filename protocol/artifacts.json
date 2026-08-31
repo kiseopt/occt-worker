@@ -22,7 +22,7 @@
       "commit": "55f93686c01528224f448c19128836e7df245f72"
     }
   },
-  "releaseBaseUrl": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/",
+  "releaseBaseUrl": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/",
   "buildFamilies": {
     "shared": "occt-worker-shared-v1",
     "isolated": "occt-worker-profile-v1"
@@ -33,14 +33,14 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 648917,
       "sha256": "c4f6db9cfd09af060018dc0dfbb1e7220431969a9ca5f9ac3f8cfbb8d874b803",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/shared-main.mjs"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/shared-main.mjs"
     },
     "shared-main.wasm": {
       "kind": "shared-main",
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 36831532,
       "sha256": "5d1b6df465a61d097be83e539b1b01f23d4cb8551612ea47cf92da8b197730df",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/shared-main.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/shared-main.wasm"
     },
     "geometry-topology.side.wasm": {
       "kind": "shared-side",
@@ -50,7 +50,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 306764,
       "sha256": "fd30e94c1f0466f5b71331a50d601dd0612919935fa99f71c8cc240ac10743f0",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/geometry-topology.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/geometry-topology.side.wasm"
     },
     "topology-query.side.wasm": {
       "kind": "shared-side",
@@ -60,7 +60,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 43352,
       "sha256": "8fb375022b91d315be8a86086a5aac464d5f54c6fe9a5bbca8debddd3af9de4b",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/topology-query.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/topology-query.side.wasm"
     },
     "modeling.side.wasm": {
       "kind": "shared-side",
@@ -70,7 +70,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 216751,
       "sha256": "47879b67df44a99847198139a38730521904dd176cb038720c4f0594af04e841",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/modeling.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/modeling.side.wasm"
     },
     "algorithms.side.wasm": {
       "kind": "shared-side",
@@ -80,7 +80,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 258270,
       "sha256": "d0926b41b0d40ea8972bc208787b2b0b8add4a24910f58472fe19627886ccc8f",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/algorithms.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/algorithms.side.wasm"
     },
     "tessellation.side.wasm": {
       "kind": "shared-side",
@@ -90,7 +90,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 27214,
       "sha256": "f77d8ff91e0ce0a71da19c328571474ce340c04559ba6d6c3bdacb79ff292b75",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/tessellation.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/tessellation.side.wasm"
     },
     "mesh.side.wasm": {
       "kind": "shared-side",
@@ -100,7 +100,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 47412,
       "sha256": "0bd2f42dd4aae86df8252c802e1070be8702225aa1cc1e65a63301a7972e4c5d",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/mesh.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/mesh.side.wasm"
     },
     "exchange-mesh.side.wasm": {
       "kind": "shared-side",
@@ -110,7 +110,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 447319,
       "sha256": "8a7cb7d48b0e164f4f20e47e928b8be94935fdd1c8da51dc39596999cc3686f5",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/exchange-mesh.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/exchange-mesh.side.wasm"
     },
     "step-shape-exchange.side.wasm": {
       "kind": "shared-side",
@@ -120,7 +120,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 103053,
       "sha256": "05df2ee50a2017b370df1707c43e36988c2514086b9cd28ed054b09bf4bb5ade",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/step-shape-exchange.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/step-shape-exchange.side.wasm"
     },
     "cad-document-exchange.side.wasm": {
       "kind": "shared-side",
@@ -130,7 +130,7 @@
       "buildFamily": "occt-worker-shared-v1",
       "sizeBytes": 316683,
       "sha256": "edd773de24796ea61c09923690d81dbaedb607843811d260e1dcf2c72b80e39c",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/cad-document-exchange.side.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/cad-document-exchange.side.wasm"
     },
     "core-modeling.wasm": {
       "kind": "isolated-profile",
@@ -138,7 +138,7 @@
       "buildFamily": "occt-worker-profile-v1",
       "sizeBytes": 22232596,
       "sha256": "dfe76614f3e0d71867bb1e47149e47770a0687a7af9a7331ebefaf5b694975d2",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/core-modeling.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/core-modeling.wasm"
     },
     "mesh.wasm": {
       "kind": "isolated-profile",
@@ -146,7 +146,7 @@
       "buildFamily": "occt-worker-profile-v1",
       "sizeBytes": 22780556,
       "sha256": "bf4bc3bcc975133975a482299971f181b3485f3bca505912c3de0e52469eea0d",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/mesh.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/mesh.wasm"
     },
     "exchange.wasm": {
       "kind": "isolated-profile",
@@ -154,7 +154,7 @@
       "buildFamily": "occt-worker-profile-v1",
       "sizeBytes": 18599871,
       "sha256": "01f377c2a152a4247a98675d2858accea1c51f47b0072bc91a793ecbe4be3cba",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/exchange.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/exchange.wasm"
     },
     "preview.wasm": {
       "kind": "isolated-profile",
@@ -162,7 +162,7 @@
       "buildFamily": "occt-worker-profile-v1",
       "sizeBytes": 12707550,
       "sha256": "7e67826d0b8f9da94dda5501a9a29b287f70309df0893b984a8ba8022d603e68",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/preview.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/preview.wasm"
     },
     "full.wasm": {
       "kind": "isolated-profile",
@@ -170,7 +170,7 @@
       "buildFamily": "occt-worker-profile-v1",
       "sizeBytes": 33477106,
       "sha256": "425a1e1ba2f800a30ee22b9d88bff9382f09000c1b031b2785fac30f184b3cc0",
-      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0-rc.1/full.wasm"
+      "url": "https://github.com/kiseopt/occt-worker/releases/download/v1.3.0/full.wasm"
     }
   }
 }
