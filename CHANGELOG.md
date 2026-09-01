@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.2 - 2026-09-02
+
+### Changed
+
+- Updated all GitHub-maintained workflow actions to their current major releases,
+  removing deprecated Node.js 20 action runtime usage.
+
 ## 1.3.1 - 2026-09-02
 
 ### Changed

@@ -27,10 +27,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -43,7 +43,7 @@ jobs:
       # built with different flags, and the artifact would still pass every later check.
       - name: Restore OCCT install
         id: occt-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: build/release/occt-install
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
@@ -53,14 +53,14 @@ jobs:
       # multi-hundred-MB entry per push and evict the repo's 10 GB budget within days,
       # and the OCCT modules that dominate this cache do not change between pushes.
       - name: Restore ThinLTO cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/release/thinlto-cache
           key: ${{ runner.os }}-thinlto-release-${{ steps.occt.outputs.key }}
       # Measured at 732 MB locally, rebuilt from scratch on every run today: a -flto=thin
       # link makes Emscripten generate its thinlto libc++/libc++abi/compiler_rt variants.
       - name: Restore Emscripten sysroot cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vendor/emsdk/upstream/emscripten/cache
           key: ${{ runner.os }}-emsdk-sysroot-release-${{ steps.occt.outputs.key }}
@@ -72,7 +72,7 @@ jobs:
       # cheap downstream can throw it away.
       - name: Save OCCT install
         if: steps.occt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: build/release/occt-install
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
@@ -95,7 +95,7 @@ jobs:
       # both load artifacts/preview.wasm, core-modeling.wasm and full.wasm directly, with
       # no skip guard. Caching the OCCT tree is what makes a PR cheap, not skipping this.
       - run: npm run build:wasm:profiles
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: release-path
           path: |
@@ -112,10 +112,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -126,17 +126,17 @@ jobs:
         run: node scripts/build-cache-key.mjs --variant=shared-pic --github | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - name: Restore PIC OCCT install
         id: occt-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: build/release/shared/occt-install-pic
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
       - name: Restore ThinLTO cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/release/shared/thinlto-cache
           key: ${{ runner.os }}-thinlto-shared-${{ steps.occt.outputs.key }}
       - name: Restore Emscripten sysroot cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vendor/emsdk/upstream/emscripten/cache
           key: ${{ runner.os }}-emsdk-sysroot-shared-${{ steps.occt.outputs.key }}
@@ -145,7 +145,7 @@ jobs:
       # 80-minute compile was lost to a later failure.
       - name: Save PIC OCCT install
         if: steps.occt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: build/release/shared/occt-install-pic
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
@@ -169,7 +169,7 @@ jobs:
           foreach ($side in $topology.sides) { $arguments += @('--side', "artifacts/$($side.artifact)") }
           node scripts/verify-symbol-closure.mjs @arguments
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: shared-path
           path: artifacts/
@@ -180,10 +180,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -194,14 +194,14 @@ jobs:
         run: node scripts/build-cache-key.mjs --variant=debug --github | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - name: Restore OCCT install
         id: occt-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: build/debug/occt-install
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
       # Debug builds -O0 -g3 with no LTO, so it needs no ThinLTO cache -- but it still
       # generates its own Emscripten sysroot variants.
       - name: Restore Emscripten sysroot cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vendor/emsdk/upstream/emscripten/cache
           key: ${{ runner.os }}-emsdk-sysroot-debug-${{ steps.occt.outputs.key }}
@@ -210,12 +210,12 @@ jobs:
       # discard the Debug OCCT tree. See the note in release-path.
       - name: Save OCCT install
         if: steps.occt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: build/debug/occt-install
           key: ${{ runner.os }}-${{ steps.occt.outputs.key }}
       - run: npm run test:debug
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: debug-path
           path: build/debug/occt-worker.debug.wasm
@@ -230,10 +230,10 @@ jobs:
     steps:
       # Submodules are required even though this job builds nothing:
       # tests/ts/step.test.mjs reads occt/data/step/screw.step from the OCCT submodule.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -242,10 +242,10 @@ jobs:
       # archive at the least common ancestor of its paths, so release-path keeps its
       # wasm//artifacts//docs/ prefixes while shared-path (a single artifacts/ path) is
       # rooted inside artifacts/ and must be unpacked back into it.
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: release-path
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: shared-path
           path: artifacts
@@ -288,15 +288,15 @@ jobs:
     steps:
       # Submodules are required: the device harness the browser suite drives fetches
       # occt/data/step/{screw,linkrods}.step, which live in the OCCT submodule.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: release-path
       # The committed manifest carries hashes from whatever machine last built locally,
@@ -322,20 +322,20 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       # Same explicit unpacking as the verify job; the debug artifact is deliberately not
       # downloaded, since debug is a test artifact and never a release asset.
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: release-path
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: shared-path
           path: artifacts
@@ -451,7 +451,7 @@ jobs:
             --tarball $env:PACKAGE_FILENAME `
             --integrity $env:PACKAGE_INTEGRITY
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: release-candidate-${{ github.sha }}
           path: release-candidate/
