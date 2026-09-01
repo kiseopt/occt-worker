@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.1 - 2026-09-02
+
+### Changed
+
+- Expanded and reorganized the English and Chinese API, protocol, capability,
+  host integration, and runtime architecture documentation.
+- Clarified BREP cache identity requirements for standalone, isolated Profile,
+  and shared runtimes, with matching generated protocol semantics.
+- Removed obsolete implementation-stage terminology from public documentation
+  and source comments.
+
 ## 1.3.0 - 2026-08-31
 
 ### Changed

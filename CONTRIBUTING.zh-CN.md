@@ -1,12 +1,25 @@
 # 贡献指南
 
-欢迎在 `README.md`、[宿主支持](docs/hosts.md) 和 [能力矩阵](docs/capabilities.md) 规定的操作与宿主边界内贡献代码。项目没有支持 SLA，路线由维护者决定。
+欢迎在 `README.zh-CN.md`、[宿主支持](docs/hosts.zh-CN.md) 和 [能力矩阵](docs/capabilities.zh-CN.md) 规定的操作与宿主边界内贡献代码。项目没有支持 SLA，路线由维护者决定。
 
 1. 初始化三个固定版本的子模块：`git submodule update --init --recursive`。
 2. 执行 `npm ci`、`npm run build:wasm` 和 `npm test`。
 3. 修改宿主边界时，安装 Chromium：`npx playwright install chromium`，并执行 `npm run test:browser`。
 4. 新机制至少增加一个代表性成功测试；只有引入独立失败机制时才增加失败测试。
 5. 协议修改必须先改 `protocol/`，然后执行 `npm run generate`，不要直接编辑生成文件。
+
+## 常用开发命令
+
+| 命令 | 用途 |
+| --- | --- |
+| `npm run generate` | 重新生成协议 TypeScript 类型与 Profile 定义 |
+| `npm run build` | 构建协议定义并编译 TypeScript（`dist/`） |
+| `npm run build:wasm` | 引导工具链并编译发布版 WebAssembly 内核 |
+| `npm run build:wasm:debug` | 编译带调试符号的 WebAssembly 内核 |
+| `npm test` | 运行 TypeScript 单元测试套件 |
+| `npm run test:browser` | 运行默认浏览器 Worker 测试（需要 Chromium） |
+| `npm run test:browser:all` | 运行跨 Chromium、Firefox 和 WebKit 的浏览器测试 |
+| `npm run test:package` | 验证打包后的 npm 消费者集成测试 |
 
 ## 仓库结构
 

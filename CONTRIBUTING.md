@@ -10,6 +10,19 @@ Contributions are welcome within the operation and host boundaries documented in
 4. Add one representative success test for a new mechanism and a failure test only when it introduces a distinct failure mode.
 5. Keep protocol changes synchronized through `protocol/`; run `npm run generate` rather than editing generated files directly.
 
+## Common development commands
+
+| Command | Purpose |
+| --- | --- |
+| `npm run generate` | Regenerate protocol TypeScript types and profile definitions |
+| `npm run build` | Build protocol definitions and compile TypeScript (`dist/`) |
+| `npm run build:wasm` | Bootstrap toolchains and build the full release WebAssembly kernel |
+| `npm run build:wasm:debug` | Build the debug WebAssembly kernel with source symbols |
+| `npm test` | Run TypeScript unit test suite |
+| `npm run test:browser` | Run default browser worker tests (requires Chromium) |
+| `npm run test:browser:all` | Run browser tests across Chromium, Firefox, and WebKit |
+| `npm run test:package` | Validate packed npm consumer integration |
+
 ## Repository map
 
 - `kernel/`: C++ modeling, query, exchange, and wasm boundary implementation.

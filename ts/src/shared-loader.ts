@@ -1,6 +1,6 @@
-// Shared Main + Side loader (stage 4).
+// Shared Main + Side loader.
 //
-// Responsibilities (see tmp-docs/wasm-implementation-runbook.zh-CN.md §7):
+// Runtime contract (docs/architecture.md):
 //   - instantiate the shared Main module from its ES6 glue factory
 //   - asynchronously load Side modules via Module.loadDynamicLibrary before
 //     the first k_handle call that needs them

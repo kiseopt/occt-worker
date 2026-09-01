@@ -401,7 +401,7 @@ async function copyLimitResults() {
   try {
     await copyText(limitReport.textContent);
     limitStatus.dataset.state = "complete";
-    limitStatus.textContent = "二分结果已复制";
+    limitStatus.textContent = "候选结果已复制";
   } catch (error) {
     limitStatus.dataset.state = "error";
     limitStatus.textContent = error instanceof Error ? error.message : String(error);

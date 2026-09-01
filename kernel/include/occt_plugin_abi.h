@@ -1,5 +1,5 @@
 // occt-worker plugin ABI: versioned contract between a shared Main module
-// and dynamically loaded Side modules (stage-4 shared architecture).
+// and dynamically loaded Side modules.
 //
 // The Main module owns memory, table, allocator, and the C++ exception
 // runtime. Side modules are relocatable PIC objects that resolve every

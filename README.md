@@ -11,9 +11,9 @@ for Node.js and browser Workers.
 [![Node.js](https://img.shields.io/node/v/occt-worker.svg)](https://www.npmjs.com/package/occt-worker)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE-APACHE-2.0.txt)
 
-[中文说明](README.zh-CN.md) · [Documentation](docs/README.md) · [Getting started](docs/getting-started.md) · [API reference](docs/api.md) · [Capability matrix](docs/capabilities.md)
+[中文说明](README.zh-CN.md) · [Documentation](docs/README.md) · [Getting started](docs/getting-started.md) · [Architecture](docs/architecture.md) · [API reference](docs/api.md) · [Capability matrix](docs/capabilities.md)
 
-**Current release:** `v1.2.0` · **Runtime:** Node.js `>=20` · **License:** Apache-2.0 for
+**Runtime:** Node.js `>=20` · **License:** Apache-2.0 for
 project code; see the distribution notices for OCCT and other third-party components.
 
 This is an independent project. It is not affiliated with, endorsed by, or sponsored
@@ -46,7 +46,7 @@ npm install occt-worker
 > **Package size vs. download size.** The npm package ships the full kernel WASM, the JS
 > runtime, types, and protocol manifests; installing it does not benefit from runtime
 > lazy-loading. Browser first-use downloads are a different metric: Side/Profile
-> artifacts (stage-4 shared/isolated architecture) resolve lazily from Release/CDN via
+> artifacts for shared and isolated runtimes resolve lazily from Release/CDN via
 > `resolveArtifact({ name })` with an optional `baseUrl` or fully custom resolver for
 > private deployments.
 
@@ -90,14 +90,59 @@ Runtimes that implement `AsyncDisposable` can use
 | Parametric features and sketches | `ParametricModel` and feature definitions | [TypeScript API](docs/api.md) |
 | Shared Main/Side high-level compatibility | `SharedClient` + `EngineCompatClient` | [TypeScript API](docs/api.md) |
 
-For an isolated profile, resolve its manifest descriptor and provide a Worker factory to
-`createWorkerProfileRuntime`. The helper verifies the artifact before starting the worker;
-register the resulting factory with `GeometryEngine` for lazy profile startup. Profile and
-shared Side binaries are release artifacts, not files in the npm tarball. The tag-based release
-workflow builds and uploads them to the matching GitHub Release and updates `protocol/artifacts.json`
-with versioned URLs and SHA-256 values. Use `SharedClient` with `EngineCompatClient` when the legacy
-high-level API should run on Main/Side; private mirrors can use `baseUrl`, `defaultBase`, or `resolve`
-without maintaining a project CDN.
+## Choose a runtime
+
+| Goal | Choose | Main boundary |
+| --- | --- | --- |
+| Run the complete kernel with the least setup | Standalone full: `DirectClient` in-process, or `WorkerClient` off the main thread | One complete artifact and one local handle arena per client |
+| Load capabilities on demand while preserving native shape identity | Shared Main/Side: `SharedClient` | Main and every loaded Side share memory, the allocator, and shape handles; loaded Sides remain resident for that Main epoch |
+| Run one fixed capability set in its own Worker | Isolated Profile: `createProfileClient` | Only that Profile starts, and its handles cannot be used by another runtime |
+| Route work among multiple isolated capability sets | `GeometryEngine` with `createWorkerProfileRuntime` factories | Cross-Profile use clones a BREP placement; it does not move a native shape handle |
+| Switch between mutually exclusive preview and full modes | `SingleRuntimeSession` with isolated Profile factories | The old runtime is closed before its replacement starts |
+| Embed in Wasmtime or another custom host | Synchronous WebAssembly ABI | The host supplies the imports and follows the message ABI |
+
+Profiles describe capability sets; runtime forms describe loading and ownership. Read the
+[runtime architecture](docs/architecture.md) before combining Profiles or retaining shapes
+across a runtime change.
+
+## Runtime layering
+
+Capability organization, binary boundaries, and runtime instances are separate layers:
+
+```text
+operation -> semantic module -> implementation unit -> Profile -> artifact -> runtime instance
+```
+
+Operations are public protocol commands. Semantic modules group related capabilities;
+implementation units define linker source, toolkit, and dependency closures; Profiles select
+tested sets of those units; artifacts are the files loaded into runtime instances. A Profile
+is therefore not just "a smaller WASM," and the Profiles do not form one strict size ladder.
+
+`preview` is the smallest official viewing Profile, while `core-modeling` is the smallest
+official modeling Profile. `full-profile` means complete capability in one isolated Profile
+runtime; it is distinct from the standalone full artifact and from a shared Main runtime
+after all required Sides are loaded.
+
+The runtime forms are standalone full, shared Main/Side, and isolated Profiles. They share
+operation contracts but differ in loading, memory and handle ownership, cleanup, and failure
+scope. See [Runtime and WASM architecture](docs/architecture.md) for the full contract and the
+generated [Profile capability table](docs/profile-capabilities.generated.md) for the exact
+Profile-to-operation mapping.
+
+## Visualization with Three.js
+
+Visualization is intentionally not built into `occt-worker`. The package owns CAD geometry,
+topology, exchange, and tessellation; [Three.js](https://threejs.org/) is the recommended layer
+for scene graphs, cameras, materials, lighting, controls, and rendering. Keeping these concerns
+separate avoids coupling the CAD kernel and its Worker lifecycle to one graphics stack, and
+keeps the same kernel usable in Node.js, headless pipelines, and applications using another
+renderer.
+
+`tessellate()` returns renderer-neutral `positions`, `normals`, `indices`, optional `uvs`, and
+`faceGroups`. These typed arrays map to
+[`THREE.BufferGeometry`](https://threejs.org/docs/#api/en/core/BufferGeometry); retain
+`faceGroups` when rendered triangles must map back to OCCT face indices for selection.
+Three.js is recommended for visualization but is not a package dependency.
 
 ## Support matrix
 
@@ -109,8 +154,9 @@ without maintaining a project CDN.
 | Wasmtime | Use the separately published `wasm/occt-worker.wasmtime.wasm`; CI uses Wasmtime 47.0.3 |
 | Shared memory | `SharedArrayBuffer` features require browser cross-origin isolation |
 | Mobile browsers and WebViews | Not part of the release certification matrix |
-| Visualization and parallel OCCT toolkits | Visualization, pthread/TBB execution, and generic OCAF authoring are outside v1 |
-| BREP | Cache format only; bind every entry to the exact wasm SHA-256 in `docs/g0-build.json` |
+| Visualization | Renderer-neutral tessellation output; use Three.js or another renderer |
+| Parallel OCCT toolkits and generic OCAF authoring | pthread/TBB execution and generic OCAF authoring are outside v1 |
+| BREP | Cache format only; bind every entry to the exact running WASM identity defined by the protocol |
 
 For the exact operation set, defaults, buffer layouts, cancellation rules, and host details,
 see [the protocol](docs/protocol.md), [capabilities](docs/capabilities.md), and
@@ -118,15 +164,15 @@ see [the protocol](docs/protocol.md), [capabilities](docs/capabilities.md), and
 
 ## Known issues and limits
 
-- Active synchronous operations cancelled through a `WorkerClient` use hard recovery:
-  the worker is rebuilt and all handles owned by the previous worker expire.
+- Cooperatively cancellable operations keep the `WorkerClient`, its handles, and queued calls
+  valid. Cancelling any other active synchronous operation rebuilds the worker and expires its handles.
 - `SharedArrayBuffer` transport still performs one copy between WebAssembly linear memory
   and host memory; it is not zero-copy.
 - BREP is a cache format, not a portable exchange format. Cache entries must be rejected
   when the running wasm SHA-256 differs from the recorded value.
 - Mobile browsers and WebViews are not covered by the release test matrix, including their
   memory limits.
-- Visualization, pthread/TBB execution, and generic OCAF authoring are outside the v1 API.
+- pthread/TBB execution and generic OCAF authoring are outside the v1 API.
 - STEP/IGES/XCAF metadata support follows the documented format-specific subset; data that
   a format cannot preserve is rejected or represented through the documented extension path.
 
@@ -171,6 +217,7 @@ with the notices in [LICENSES.md](LICENSES.md), [NOTICE](NOTICE), and
 
 - [Documentation index](docs/README.md)
 - [Getting started](docs/getting-started.md)
+- [Runtime and WASM architecture](docs/architecture.md)
 - [TypeScript API](docs/api.md)
 - [Protocol specification](docs/protocol.md)
 - [Capability matrix](docs/capabilities.md)

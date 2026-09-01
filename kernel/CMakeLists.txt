@@ -82,7 +82,7 @@ if(NOT KERNEL_BUILD_SHARED)
 endif()
 
 # ---------------------------------------------------------------------------
-# Shared Main + Side targets (stage 4).
+# Shared Main + Side targets.
 # ---------------------------------------------------------------------------
 
 # Side modules first: their import closure drives the Main export manifest.

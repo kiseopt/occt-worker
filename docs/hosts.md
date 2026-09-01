@@ -2,6 +2,10 @@
 
 [中文说明 / Chinese guide](hosts.zh-CN.md)
 
+Runtime composition, Profile boundaries, shape ownership, and memory terminology are
+defined in the [runtime architecture](architecture.md). This page defines host support
+and integration requirements.
+
 ## Verified hosts
 
 The release artifact `wasm/occt-worker.wasm` is validated in Node, Node `worker_threads`, and Chromium, Firefox, and WebKit Web Workers. Those hosts run the same SHA-256 artifact and call `_initialize` exactly once per instance. The required import and export surface is frozen in `protocol/wasm-surface.json`; `scripts/verify-wasm.mjs` rejects any drift.
@@ -24,20 +28,67 @@ platforms may require adapting the PowerShell bootstrap and build commands.
 
 ## Wasmtime
 
-Wasmtime uses the separate `wasm/occt-worker.wasmtime.wasm` artifact. Emscripten 4.0.23 emits the Phase 3 form of WebAssembly exception handling for `-fwasm-exceptions`; current Wasmtime rejects that encoding with `legacy_exceptions feature required for try instruction`. `npm run build:wasm:wasmtime` preserves C++ exception behavior while translating the already-built module to the standardized `try_table`/`exnref` encoding with Binaryen. It never overwrites `wasm/occt-worker.wasm`, because Node and the supported browsers do not yet all accept the standardized exception-reference form.
+### Artifact conversion
 
-Run `npm run test:wasmtime -- -WasmtimePath /path/to/wasmtime` to validate the alternate artifact. The test preloads the deterministic `env` stubs, lets Wasmtime supply WASI Preview 1, initializes the reactor, and exercises scope creation, primitive construction, boolean modeling, bounding-box queries, tessellation, structured errors, and resource cleanup through `k_handle`. CI and the release workflow install the pinned Wasmtime 47.0.3 binary with `scripts/bootstrap-wasmtime.ps1`, rebuild the translated artifact, run this smoke, and publish the artifact with its checksum. Release evidence is recorded in `docs/wasmtime-build.json`. Embedders must provide the imports frozen in `protocol/wasm-surface.json`, call `_initialize` once, and then use the same message ABI as browser and Node hosts.
+Wasmtime uses the separate `wasm/occt-worker.wasmtime.wasm` artifact. Emscripten 4.0.23 emits the Phase 3 form of WebAssembly exception handling for `-fwasm-exceptions`; current Wasmtime rejects that encoding with `legacy_exceptions feature required for try instruction`.
 
-The allowlisted WASI `fd_*`, environment, and clock imports do not expose protocol filesystem or wall-clock behavior. DirectClient supplies deterministic stubs: writes are discarded while reporting the consumed byte count, reads and environment enumeration are empty, and clock values advance from a fixed epoch. The non-WASI `env` imports are Emscripten/OCCT runtime hooks and are likewise implemented by the browser/Node adapter. `occt_worker_progress` and `occt_worker_cancelled` connect supported OCCT algorithms to host progress and cancellation state.
+`npm run build:wasm:wasmtime` uses Binaryen to translate the built module to standardized `try_table`/`exnref` encoding while preserving C++ exception behavior. It does not overwrite `wasm/occt-worker.wasm`, because Node and the supported browsers do not all accept that exception-reference form.
+
+### Verification and embedding
+
+Run `npm run test:wasmtime -- -WasmtimePath /path/to/wasmtime` to validate the alternate artifact. The test preloads deterministic `env` stubs, lets Wasmtime supply WASI Preview 1, initializes the reactor, and covers scope creation, primitives, booleans, bounding boxes, tessellation, structured errors, and resource cleanup through `k_handle`.
+
+CI and the release workflow use `scripts/bootstrap-wasmtime.ps1` to install the pinned Wasmtime version, rebuild the translated artifact, run the smoke test, and publish the artifact with its checksum. Release evidence is recorded in `docs/wasmtime-build.json`.
+
+Embedders must provide the imports frozen in `protocol/wasm-surface.json`, call `_initialize` once, and then use the same message ABI as browser and Node hosts.
+
+### Deterministic imports
+
+The allowlisted WASI `fd_*`, environment, and clock imports do not expose protocol filesystem or wall-clock behavior. `DirectClient` supplies deterministic stubs: writes are discarded while reporting the consumed byte count, reads and environment enumeration are empty, and clock values advance from a fixed epoch.
+
+The non-WASI `env` imports are Emscripten/OCCT runtime hooks implemented by the browser and Node adapters. `occt_worker_progress` and `occt_worker_cancelled` connect supported OCCT algorithms to host progress and cancellation state.
 
 ## Worker, cancellation, and shared memory
 
-`WorkerClient.request()` accepts `{ signal, onProgress }`. A queued call is removed without disturbing the active worker. Tessellation, VRML, mesh (STL/OBJ/PLY/glTF), and shape-only STEP/IGES import/export use `SharedArrayBuffer` for cooperative cancellation and preserve the worker, handles, and following queue when OCCT acknowledges the break. Mesh exchange cancellation is checked at parser, serialization, and buffer-materialization phase boundaries. This requires a host where `SharedArrayBuffer` is available; browsers therefore need cross-origin isolation. Other active synchronous calls, and supported calls without shared memory support, retain hard cancellation: the worker is terminated and rebuilt and all old handles and queued calls become invalid.
+### Cooperative cancellation vs hard recovery
 
-Dedicated Worker isolation lets the main page report JavaScript-visible soft failures such as `abort()` and `RangeError`. It does not protect an iOS page from an out-of-memory termination: WebKit runs the Worker and page in the same WebContent process, and Jetsam terminates that entire process. After a reload, an unfinished-attempt marker can show only that the previous attempt did not complete; it cannot prove why.
+`WorkerClient.request()` accepts `{ signal, onProgress }`. A queued call is removed without disturbing the active worker.
 
-`ArtifactLoadAttemptTracker` provides that heuristic for full-profile loading. When passed as `loadAttempt`, `createWorkerProfileRuntime` records `fetching`, `compiling`, `instantiating`, and `ready`; successful loads and catchable failures clear the active marker and store their result separately. Applications can use `unfinished()` after a reload to report that the previous full-feature load did not complete, without claiming a cause. The device measurement page uses the same tracker for memory-limit candidates.
+- **Cooperative cancellation:** Tessellation and edge tessellation, VRML and mesh (STL/OBJ/PLY/glTF) exchange, and STEP/IGES shape and document import/export use `SharedArrayBuffer` for cooperative cancellation. When OCCT acknowledges the cancellation signal, the worker, its shape handles, and subsequent queued calls remain valid. Mesh exchange checks the cancellation flag while parsing, serializing, and copying output buffers.
+- **Hard recovery:** For active synchronous operations that do not support cooperative cancellation, or environments without `SharedArrayBuffer`, cancellation terminates and rebuilds the worker. All previous handles and pending queued requests are invalidated.
 
-In browsers, official artifacts with a declared SHA-256 are cached as wasm bytes through the Cache API. The cache key includes the artifact name and hash. Every cache hit is hashed again; invalid bytes are deleted and downloaded again. Compiled `WebAssembly.Module` objects are not persisted.
+### SharedArrayBuffer and cross-origin isolation
 
-For bulk data, binary imports also accept `SharedArrayBuffer`; unlike ordinary `ArrayBuffer` inputs, these are shared with the worker and are not detached. `WorkerClient.requestShared(op, args, options)` requests `SharedArrayBuffer` materialization for all output buffer descriptors in a low-level protocol result. This avoids cloning or detaching data at the worker boundary, but the host still copies bytes once between wasm linear memory and the shared buffer. Browsers require cross-origin isolation for both bulk sharing and cooperative cancellation.
+For bulk data transfer, binary imports accept `SharedArrayBuffer`. Unlike standard `ArrayBuffer` inputs, shared buffers cross the worker boundary without transfer or detachment.
+
+`WorkerClient.requestShared(op, args, options)` allocates a `SharedArrayBuffer` for each output buffer descriptor and copies the data from WebAssembly linear memory. The shared buffer is neither cloned nor detached at the Worker boundary, but this path still performs one copy into host memory.
+
+Browsers require cross-origin isolation headers for both bulk buffer sharing and cooperative cancellation:
+
+```http
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+### Node.js `worker_threads` integration
+
+`WorkerClient` expects a `WorkerLike` interface compatible with browser Web Workers. When hosting `occt-worker` in Node.js `worker_threads`, the host adapter must implement:
+
+```ts
+export interface WorkerLike {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+  addEventListener(type: "message", listener: (event: MessageEvent) => void): void;
+  addEventListener(type: "error", listener: (event: ErrorEvent) => void): void;
+  terminate(): void;
+}
+```
+
+### Process isolation and mobile limits
+
+Dedicated Worker isolation lets the main page handle JavaScript-visible failures such as `abort()` and `RangeError`. However, it does not isolate against operating-system memory terminations: on iOS WebKit, the page and Worker share the same WebContent process, and memory pressure causes Jetsam to terminate the entire process.
+
+`ArtifactLoadAttemptTracker` provides heuristic tracking for full-profile loading. When passed as `loadAttempt`, `createWorkerProfileRuntime` records progression through `fetching`, `compiling`, `instantiating`, and `ready`. Applications can call `unfinished()` after a reload to detect that the previous load attempt did not complete.
+
+### Artifact caching in browsers
+
+In browser environments, the default isolated Profile loader caches official artifacts with a declared SHA-256 as raw WASM bytes via the Cache API. The cache key combines the artifact name and hash. Every cache hit is re-verified by checksum; invalid entries are purged and re-fetched. A custom `loadArtifact` callback and the shared Main/Side loader bypass this cache. Compiled `WebAssembly.Module` objects are intentionally not persisted.

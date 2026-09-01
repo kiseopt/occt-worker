@@ -4,9 +4,9 @@ param(
   [switch]$SidesOnly
 )
 
-# Shared Main + Side build (stage 4 of the wasm modular runbook).
+# Shared Main + Side build.
 #
-# Layout decisions mandated by the runbook:
+# Layout invariants:
 #   - shared uses its OWN PIC/relocatable OCCT build directory; the stable
 #     non-PIC directory used by full is never reused or merged.
 #   - shared-main: MAIN_MODULE=2 with ES6 modularized glue, no STANDALONE_WASM.

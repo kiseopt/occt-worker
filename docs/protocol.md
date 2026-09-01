@@ -2,91 +2,362 @@
 
 [中文说明 / Chinese guide](protocol.zh-CN.md)
 
-The BSpline editing operations `editCurveBSpline` and `editSurfaceBSpline` use explicit action values for knot insertion/removal, degree elevation, periodicity conversion, direction exchange/reversal, and complete control-net replacement. Indices are zero-based at the protocol boundary; each operation returns a new scoped shape and leaves its input unchanged.
+> **Version note:** This page specifies Protocol Wire Version `v1.2.0` (as recorded in `protocol/artifacts.json`). The npm package release version is tracked independently in `package.json`.
 
 ## Requests and responses
 
-The protocol schema, operation catalog, per-operation contracts, and error list are the single source of truth in `protocol/`. `operation-contracts.json` defines every operation's argument and result shape; generation fails if it or `historySupport` omits an operation, and `protocol.schema.json` contains the generated request/result definitions. A request is `{ id, op, args }`; success is `{ id, ok: true, result }`; failure is `{ id, ok: false, error: { code, message, details? } }`. IDs are client-owned and monotonic. `message` is for people, while `code` and documented `details` are stable branching fields. Cooperative kernel cancellation uses the stable `Cancelled` code rather than an algorithm, tessellation, or import/export failure. Every dispatched failure includes `details.operation`; exchange operations additionally include `details.format` (`step`, `xcaf`, `iges`, `stl`, `obj`, `ply`, `gltf`, `vrml`, or `brep`). `probeFormat()` identifies native XCAF binary files by the `BINFILE` header and XML files by the `XmlXCAF` document format.
+The authoritative protocol definitions live in `protocol/`. `operation-contracts.json` defines every operation's arguments and result. Generation fails when it or `historySupport` omits an operation. `protocol.schema.json` contains the generated request and result schemas.
 
-The wasm boundary is synchronous and serial. The host calls `_initialize` once, allocates UTF-8 request bytes with `k_alloc`, calls `k_handle(ptr, len)`, reads `k_response_ptr()` for the response, then calls `k_free(ptr)`. A zero return from `k_handle` invalidates the instance. The public message ABI consists of initialization, the message entry point, allocation/free, and buffer accessors; the complete required WebAssembly import/export surface, including runtime support exports, is frozen in `wasm-surface.json`.
+Protocol frames use these shapes:
+
+- Request: `{ id, op, args }`
+- Success: `{ id, ok: true, result }`
+- Failure: `{ id, ok: false, error: { code, message, details? } }`
+
+IDs are client-owned and monotonic. `message` is for human diagnosis; `code` and documented `details` are stable fields for programmatic branching. Cooperative cancellation uses `Cancelled`, not an algorithm, tessellation, or exchange failure code.
+
+`details` is optional. A `KernelFailure` from a parsed operation includes `details.operation`. Exchange failures also include `details.format`: `step`, `xcaf`, `iges`, `stl`, `obj`, `ply`, `gltf`, `vrml`, or `brep`. Malformed frames and runtime failures can omit `details`. `probeFormat()` identifies native XCAF binary by its `BINFILE` header and XML by the `XmlXCAF` document format.
+
+### Message frame examples
+
+**1. Request frame:**
+```json
+{
+  "id": 1,
+  "op": "makeBox",
+  "args": {
+    "scopeId": 1,
+    "size": [100, 60, 4]
+  }
+}
+```
+
+**2. Success response frame:**
+```json
+{
+  "id": 1,
+  "ok": true,
+  "result": {
+    "shape": 1
+  }
+}
+```
+
+**3. Error response frame:**
+```json
+{
+  "id": 2,
+  "ok": false,
+  "error": {
+    "code": "InvalidArgs",
+    "message": "Box dimensions must be positive",
+    "details": {
+      "operation": "makeBox"
+    }
+  }
+}
+```
+
+### WebAssembly serial message ABI
+
+The WebAssembly boundary is synchronous and serial. A single execution turn follows these steps:
+
+1. The host invokes `_initialize` once per instance.
+2. The host allocates linear memory for the UTF-8 JSON request using `k_alloc(len)`.
+3. The host writes the request bytes into the allocated pointer.
+4. The host invokes `k_handle(ptr, len)` and receives the response length in bytes.
+5. The host reads exactly that many bytes starting at `k_response_ptr()`.
+6. The host frees the request buffer using `k_free(ptr)`.
+
+The public message ABI consists of initialization, the message entry point, allocation/free, and buffer accessors; the complete required WebAssembly import/export surface is frozen in `wasm-surface.json`.
 
 ## Handles, scopes, and buffers
 
-Shape handles are u32 values valid only inside one kernel instance. The typed TypeScript API wraps them in an epoch-checked `ShapeHandle`. Its public low-level `request()` escape hatch is explicitly unsafe: raw u32 values bypass TypeScript owner, epoch, and scope provenance, although kernel generation checks still reject stale or foreign-instance values. A scope owns every shape created with its `scopeId`; `endScope` releases all remaining shapes in that scope. `release` rejects stale or unknown handles.
+- A shape handle is a `u32` value valid only inside one kernel instance.
+- The typed API wraps it in an epoch-checked `ShapeHandle`.
+- The low-level `request()` method is explicitly unsafe. Raw `u32` values bypass TypeScript owner, epoch, and scope provenance checks.
+- Kernel generation checks reject stale handles, but the raw number does not identify its instance. A colliding value can therefore resolve in another live instance.
+- A scope owns every shape created with its `scopeId`. `endScope` releases all remaining shapes in that scope; `release` rejects stale or unknown handles.
 
-Buffers are described by `{ bufferId, byteLength, layout }`. Normal `DirectClient` requests copy output buffers into host memory and immediately free their kernel descriptors. For reusable same-thread input, `DirectClient.createBuffer()` returns an explicitly owned `DirectBuffer`; callers reacquire its `view()` after every wasm call and release it with `freeBuffer()`. Worker clients do not expose kernel buffer IDs: normal requests materialize transferable `ArrayBuffer` values, while `WorkerClient.requestShared()` materializes each output descriptor into a `SharedArrayBuffer`; shared inputs cross the worker boundary without transfer or detachment. These worker modes still copy once between wasm linear memory and host memory.
+Buffers are described by `{ bufferId, byteLength, layout }`:
 
-## Batch
+```json
+{
+  "bufferId": 1,
+  "byteLength": 2400,
+  "layout": "f32x3"
+}
+```
 
-`batch` executes operations in order and stops at the first failure. A `{"$ref": 0}` value resolves to the `shape` result of an earlier operation. The batch is not transactional: shapes created before a failure remain owned by its scope. A nested failure includes `error.details.operation: "batch"`, `nestedOperation`, and (for exchange operations) `format`.
+- Normal `DirectClient` requests copy output buffers into host memory and immediately free their kernel descriptors.
+- `DirectClient.createBuffer()` creates a reusable same-thread `DirectBuffer`. Reacquire `view()` after every WASM call and release the buffer with `freeBuffer()`.
+- Worker clients do not expose kernel buffer IDs. Normal requests create transferable `ArrayBuffer` results.
+- `WorkerClient.requestShared()` creates a `SharedArrayBuffer` for each output descriptor and copies data from WASM linear memory into it.
+- Shared inputs cross the Worker boundary without transfer or detachment. Both Worker output modes still perform one copy between WASM linear memory and host memory.
+
+## Batch execution
+
+`batch` executes operations in order and stops at the first failure. A `{"$ref": N}` value resolves to the `shape` result of the zero-based `N`-th earlier operation.
+
+```json
+{
+  "id": 3,
+  "op": "batch",
+  "args": {
+    "scopeId": 1,
+    "ops": [
+      { "op": "makeBox", "args": { "size": [100, 60, 4] } },
+      { "op": "makeCylinder", "args": { "radius": 8, "height": 4, "origin": [50, 30, 0] } },
+      { "op": "booleanCut", "args": { "base": { "$ref": 0 }, "tools": [{ "$ref": 1 }] } }
+    ]
+  }
+}
+```
+
+The batch is **not transactional**: shapes created before a failure remain owned by its scope. The outer protocol response remains successful; a nested failure is returned as `result.error` with `details.operation: "batch"`, `nestedOperation`, and (for exchange operations) `format`.
 
 ## Mesh layout and matrices
 
-The v1.2.0 tessellation layouts are `f32x3` positions, `f32x3` normals, `u32` triangle indices, and `u32x3` face groups. Every face has an isolated vertex range; consumers must not infer sharing between faces. A face group is `(faceIndex, indexStart,indexCount)`; start and count address scalar entries in `indices`, so one triangle contributes three. Edge tessellation uses `(edgeIndex,vertexStart,vertexCount)` groups; start and count address `f32x3` vertices in `positions`. Face, edge, vertex, and batch indices are zero-based. Passing `includeUV: true` also returns `uvs` as `f32x2`, aligned with `positions`.
+Tessellation uses these layouts:
 
-`matrix12` is row-major `[m11,m12,m13,m14,m21,m22,m23,m24,m31,m32,m33,m34]`, mapping a point to `(m11*x+m12*y+m13*z+m14, m21*x+m22*y+m23*z+m24, m31*x+m32*y+m33*z+m34)`. For `transform`, `matrix` takes precedence and the other transform components are ignored. Without `matrix`, the composed matrix is `T*R*S*M`, so points experience mirror, scale, rotation, then translation. `massProps.inertia` is row-major `[Ixx,Ixy,Ixz,Iyx,Iyy,Iyz,Izx,Izy,Izz]` in global model coordinates about the returned center.
+- positions: `f32x3`
+- normals: `f32x3`
+- triangle indices: `u32`
+- face groups: `u32x3` as `(faceIndex, indexStart, indexCount)`
+- optional UVs: `f32x2`, aligned with positions
+
+Every face has an isolated vertex range; consumers must not infer sharing between faces. Face-group offsets count scalar entries in `indices`, so one triangle contributes three entries. Edge groups use `(edgeIndex, vertexStart, vertexCount)`, with offsets measured in `f32x3` vertices. Face, edge, vertex, and batch indices are zero-based.
+
+`matrix12` is the row-major array `[m11,m12,m13,m14,m21,m22,m23,m24,m31,m32,m33,m34]`. It maps a point to `(m11*x+m12*y+m13*z+m14, m21*x+m22*y+m23*z+m24, m31*x+m32*y+m33*z+m34)`.
+
+For `transform`, `matrix` takes precedence and other transform components are ignored. Without `matrix`, composition is `T*R*S*M`, so points experience mirror, scale, rotation, then translation. `massProps.inertia` is row-major `[Ixx,Ixy,Ixz,Iyx,Iyy,Iyz,Izx,Izy,Izz]` in global model coordinates about the returned center.
 
 ## Capabilities, versions, and defaults
 
-All public protocol defaults are frozen in `operation-contracts.json` under `semantics.defaults` and generated into `PROTOCOL_SEMANTICS` and `protocol.schema.json`'s `x-protocolSemantics`. The main numeric defaults are classification tolerance `1e-7`, modeling/healing tolerance `1e-6`, tessellation/STL deflections `0.1` linear and `0.5` angular, STEP unit `mm`, and full revolution angle `2*pi`. Origins default to `(0,0,0)`, axis directions to `(0,0,1)`, history and UV output to false, polygon closure and transform copy to true, and omitted transform parts to identity.
+Public defaults are defined in `operation-contracts.json` under `semantics.defaults` and generated into `PROTOCOL_SEMANTICS` and `protocol.schema.json`'s `x-protocolSemantics`. Important defaults include:
 
-Exchange defaults are also frozen per operation: STEP/IGES use `mm`, STEP timestamps use `2026-01-01T00:00:00`, STL exports binary, PLY exports ASCII, glTF exports GLB, VRML exports version 2, native XCAF uses binary persistence, and opt-in mesh/document import results default off. Shape-based STL, OBJ, PLY, glTF, and VRML exporters share linear/angular deflection and relative-mode options; buffer-based overloads ignore tessellation options by contract.
+- classification tolerance: `1e-7`;
+- modeling and healing tolerance: `1e-6`;
+- tessellation/STL deflection: `0.1` linear and `0.5` angular;
+- origin: `(0,0,0)` and axis direction: `(0,0,1)`;
+- history and UV output: false;
+- polygon closure and transform copy: true; and
+- omitted transform components: identity.
+
+Exchange defaults are defined per operation: STEP/IGES use `mm`; STEP timestamps use `2026-01-01T00:00:00`; STL exports binary; PLY exports ASCII; glTF exports GLB; VRML exports version 2; native XCAF uses binary persistence; and optional mesh/document import results default off. Shape-based STL, OBJ, PLY, glTF, and VRML exporters share linear/angular deflection and relative-mode options. Buffer-based overloads ignore tessellation options.
 
 ## History and ShapeUpgrade
 
-History is a local mapping for one operation, not persistent topological naming. Cross-operation naming and feature-tree references belong in the higher-level parametric SDK. `historySupport` explicitly classifies every catalog operation; the three boolean operations, `cylindricalHole`, `defeature`, `extrude`, `revolve`, `loft`, `sweepPipe`, `fillet`, `chamfer`, `sew`, `fixShape`, `unifySameDomain`, `transform`, `generalTransform`, `translate`, `rotate`, `scale`, and `mirror` are `full`. `sweepPipeShell` is `partial`: OCCT maps the spine and profiles, but does not expose topology history for an auxiliary spine. Operations without a reliable OCCT history source remain `unsupported` and are never presented as universal topology naming.
+History is a local mapping for one operation, not persistent topological naming. Cross-operation naming and feature-tree references belong in the higher-level parametric SDK.
 
-`shapeUpgrade` wraps the shape-level OCCT ShapeUpgrade algorithms. Modes are `continuity`, `angle`, `area`, `closedFaces`, `closedEdges`, `convertToBezier`, `removeInternalWires`, and `removeLocations`. Continuity criteria are `c0` through `c3` or `cn`; angle values are radians; area division selects exactly one of maximum-area, approximate-part-count, or fixed U/V-count semantics; internal-wire removal uses projected contour area; and location removal can begin at the shape, compound, solid, shell, or face level. Divide and conversion modes share explicit precision bounds, surface-segment mode, and applicable edge selection (`0` free, `1` shared, `2` all). Shape upgrade is topology-changing: input face/edge indices do not carry over and no operation history is reported.
+`historySupport` classifies every operation:
+
+- `full`: booleans, `cylindricalHole`, `defeature`, `extrude`, `revolve`, `loft`, `sweepPipe`, `fillet`, `chamfer`, `sew`, `fixShape`, `unifySameDomain`, `transform`, `generalTransform`, `translate`, `rotate`, `scale`, and `mirror`;
+- `partial`: `sweepPipeShell`, because OCCT maps the spine and profiles but not an auxiliary spine; and
+- `unsupported`: operations without a reliable OCCT history source.
+
+`shapeUpgrade` wraps the shape-level OCCT ShapeUpgrade algorithms. Its modes are `continuity`, `angle`, `area`, `closedFaces`, `closedEdges`, `convertToBezier`, `removeInternalWires`, and `removeLocations`.
+
+- Continuity criteria are `c0` through `c3` or `cn`.
+- Angles are in radians.
+- Area division selects exactly one of maximum area, approximate part count, or fixed U/V counts.
+- Internal-wire removal uses projected contour area.
+- Location removal can start at the shape, compound, solid, shell, or face level.
+- Divide and conversion modes share precision bounds, surface-segment mode, and edge selection (`0` free, `1` shared, `2` all).
+
+Shape upgrade changes topology: input face and edge indices do not carry over, and no operation history is reported.
 
 ## Operation catalog
 
-The current v1.2.0 operation set also includes polygonal and curve construction (`makeVertex`, `makePolygon`, `makeWire`, `makeFace`, `makeFaceOnSurface`, `makeShell`, `makeSolidFromShell`, `makeCompound`, `makeCompSolid`, `makeEdgeLine`, `makeEdgeArc`, `makeEdgeCircle`, `makeEdgeEllipse`, `makeEdgeHyperbola`, `makeEdgeParabola`, `makeEdgeOffset`, `makeEdgeBezier`, `makeEdgeBSpline`, `makeEdgeHelix`), point-set BSpline approximation (`approximateCurveBSpline`, `approximateSurfaceBSpline`), bounded curve/surface extension (`extendCurve`, `extendSurface`), curve control-net editing (`curveControlData`, `updateCurvePole`), bounded and filling surface construction (`makeSurfaceBezier`, `makeSurfaceBSpline`, `makeSurfaceFace`, `makeSurfaceExtrusion`, `makeSurfaceRevolution`, `makeSurfaceRuled`, `makeSurfaceOffset`, `makeSurfaceFilling`), surface control-net editing and conversion (`surfaceControlData`, `updateSurfacePole`, `trimSurface`, `convertSurfaceToBSpline`), primitives (`makeSphere`, `makeCone`, `makeTorus`), `extrude`, `revolve`, `loft`, `sweepPipe`, `sweepPipeShell`, `booleanFuse`, `booleanCut`, `booleanCommon`, `section`, `generalFuse`, `selectGeneralFuseCells`, `draftAngle`, `localPrism`, `fillet`, `chamfer`, `hollow`, `offsetShape`, `offsetWire2D`, `sew`, `fixShape`, `unifySameDomain`, `transform`, `generalTransform`, `translate`, `rotate`, `scale`, `mirror`, and `batchTransformCopy`. Curve control arrays use zero-based indices; editing returns a new edge over the input parameter domain. Approximation uses OCCT chord-length, centripetal, or uniform parameterization and a requested degree/continuity/tolerance range. `makeSurfaceFilling` consumes one closed boundary wire in wire order and optionally adds interior 3D point constraints. `makeFaceOnSurface` projects missing boundary pcurves onto the copied support surface and accepts arbitrary outer and hole wires. `selectGeneralFuseCells` applies zero-based take/avoid input-index rules and optionally merges equal non-zero materials or creates typed containers. `draftAngle` applies one direction, angle, and neutral plane to zero-based input face indices. `localPrism` performs length-mode `BRepFeat_MakePrism` add/cut on faces belonging to the base shape. Surface extension grows a rectangular outer boundary and preserves input hole wires. Surface control grids use zero-based U-major `poles[u][v]` and `weights[u][v]`; surface editing returns a new rectangular face over the requested finite UV domain. `transform.copy` controls whether OCCT duplicates the transformed topology (default `true`). `batchTransformCopy` creates `count` transformed copies, excluding the input: linear copies use a per-copy `translation`, while circular copies divide the requested total `angle` evenly around `origin` and `direction`. `sweepPipeShell` additionally supports `fixedAxis` (`axis`) and `auxiliarySpine` (`auxiliarySpine`, optional `curvilinearEquivalence`). Query operations are `bbox`, `massProps`, `topologyCounts`, `getSubShapes`, `getSubShape`, `getAdjacency`, `distance`, `classifyPoint`, `shapeType`, `isSameShape`, `isValid`, `curveDomain`, `evaluateCurve`, `surfaceDomain`, and `evaluateSurface`. Mesh and exchange operations are `tessellate`, `tessellateEdges`, STL, BREP, STEP, IGES, VRML, OBJ, PLY, and glTF/GLB import/export, STEP and IGES XCAF document import/export, native XCAF binary/XML import/export, and `probeFormat`. `capabilities` is authoritative for the exact set available in a build.
+### Semantic modules
+
+The current v1.2.0 operation set is grouped by semantic module below. The exact operation names and profile membership remain authoritative in [`protocol/modules.json`](../protocol/modules.json) and [`protocol/operations.json`](../protocol/operations.json).
+
+| Semantic module | Scope |
+| --- | --- |
+| `runtime` | Capabilities, scopes, release, buffers, statistics, and batch execution |
+| `geometry-topology` | Curves, surfaces, construction, approximation, editing, continuity, and tolerances |
+| `topology-query` | Subshape catalogs, adjacency, type, identity, bounding boxes, and OBB |
+| `modeling` | Primitives, sweeps, booleans' feature builders, offsets, fillets, chamfers, holes, and transforms |
+| `algorithms` | Boolean/section analysis, projections, extrema, intersections, HLR, healing, and ShapeUpgrade |
+| `tessellation` | Shape and edge tessellation plus existing triangulation access |
+| `mesh` | Triangulation validation, replacement, and repair |
+| `exchange-mesh` | STL, OBJ, PLY, glTF/GLB, and VRML mesh/document exchange |
+| `step-shape-exchange` | BREP, STEP shape exchange, and format probing |
+| `cad-document-exchange` | STEP/IGES XCAF documents and native XCAF persistence |
+
+`capabilities` is authoritative for the exact operation set available in a loaded build. All
+operation arguments and results are defined by `operation-contracts.json`; this page summarizes
+the wire-level rules and does not replace those generated contracts.
 
 ## Queries, sections, and HLR
 
-`distance` reports all OCCT minimum-distance solutions, `innerSolution`, and vertex/edge/face support classification for both inputs. Support records use stable zero-based topology indices when the reported support belongs to that input, and include edge parameters or face UV parameters where applicable. `middlePath` extracts the OCCT center path of a pipe-like shape between two face or wire subshapes of that shape. `sectionAnalysis` reports indexed section edges, lengths, ancestor faces on both inputs, isolated section vertices, optional intersection-curve approximation, and optional pcurve construction.
+- `distance` reports all minimum-distance solutions, `innerSolution`, and vertex/edge/face support for both inputs. Support records use stable zero-based indices when the support belongs to that input and include edge parameters or face UV parameters when available.
+- `middlePath` extracts the OCCT center path of a pipe-like shape between two of its face or wire subshapes.
+- `sectionAnalysis` reports indexed section edges, lengths, ancestor faces on both inputs, isolated section vertices, optional curve approximation, and optional input pcurves.
+- `projectHLR` uses the exact `TKHLR` B-Rep algorithm and returns scoped `visible` and `hidden` edge compounds. `direction` points from the camera toward the model; `up` fixes the view orientation. Parallel projection is the default. Perspective projection requires a positive `focus` distance from the Z=0 projection plane to the eye. Every result edge lies on Z=0 in projection coordinates.
+- `getSubShape` returns a scope-owned handle for a zero-based indexed subshape.
 
-`projectHLR` uses the exact `TKHLR` B-Rep algorithm and returns scoped `visible` and `hidden` edge compounds. `direction` points from the camera toward the model and `up` fixes the view orientation. Parallel projection is the default; perspective projection requires a positive `focus` distance from the Z=0 projection plane to the eye. Result geometry is expressed in projection coordinates with every edge on Z=0.
-
-`getSubShape` materializes a zero-based indexed subshape into the caller's scope, allowing imported or generated solids to expose individual edges and faces to analytic operations. Curve evaluation uses the native OCCT edge parameter domain and returns the point, first and second derivatives, tangent availability, tangent, and curvature. Surface evaluation uses the restricted face UV domain and returns point/derivative data, the topologically oriented face normal, and signed principal, mean, and Gaussian curvatures when defined. Reversing a face reverses its normal and signed principal/mean curvatures; Gaussian curvature is unchanged. STL import and export both use memory streams; imported STL data becomes a triangulated TopoDS compound and does not recover analytic CAD surfaces.
+Curve evaluation uses the native OCCT edge parameter domain and returns the point, first and second derivatives, plus optional tangent and curvature fields with availability flags. Surface evaluation uses the restricted face UV domain and returns derivative data plus the topologically oriented normal and signed principal, mean, and Gaussian curvatures when defined. Reversing a face reverses its normal and signed principal/mean curvatures; Gaussian curvature is unchanged.
 
 ## Curves, surfaces, and mesh operations
 
-`makeEdgeArc` accepts either three points or a circle definition (`center`, `normal`, `radius`, `startAngle`, `endAngle`, and optional `xDirection`). Hyperbola and parabola construction requires explicit finite parameter limits because their natural OCCT domains are unbounded. `makeEdgeOffset` retains its basis edge domain and uses OCCT's tangent/reference-direction cross-product convention. `makeEdgeBSpline` accepts JSON points or an `f64x3` input buffer: interpolation is the default, while `mode: "controlPoints"` accepts degree, knots, multiplicities, weights, and periodicity. `makeEdgeHelix` constructs the edge from a two-dimensional line on a cylindrical surface and supports both handedness values. Derived surface construction uses finite input-edge or input-face topology domains; surface offsets preserve the input outer and hole wires. `exportSTL` accepts `encoding: "binary" | "ascii"` (binary is the default) and routes the generated triangulation through the corresponding OCCT `RWStl` writer. Shape export also accepts `relative` (default `false`) to interpret `linearDeflection` relative to shape size, matching the other tessellated format exporters.
+The BSpline editing operations `editCurveBSpline` and `editSurfaceBSpline` use explicit action
+values for knot insertion/removal, degree elevation, periodicity conversion, direction
+exchange/reversal, and complete control-net replacement. Indices are zero-based at the protocol
+boundary; each operation returns a new scoped shape and leaves its input unchanged.
+
+- `makeEdgeArc` accepts three points or a circle definition: `center`, `normal`, `radius`, `startAngle`, `endAngle`, and optional `xDirection`.
+- Hyperbola and parabola construction requires explicit finite parameter limits because the natural OCCT domains are unbounded.
+- `makeEdgeOffset` preserves the basis edge domain and follows OCCT's tangent/reference-direction cross-product convention.
+- `makeEdgeBSpline` accepts JSON points or an `f64x3` input buffer. Interpolation is the default; `mode: "controlPoints"` accepts degree, knots, multiplicities, weights, and periodicity.
+- `makeEdgeHelix` constructs an edge from a two-dimensional line on a cylindrical surface and supports both handedness values.
+- Derived surfaces use finite input-edge or input-face topology domains. Surface offsets preserve the input outer and hole wires.
+
+## Parametric CAD
+
+The protocol exposes the serializable `ParametricModel` feature layer through the TypeScript
+client. Expressions use named arithmetic without `eval`; feature dependencies are topologically
+ordered and cycles are rejected. A recompute builds in a fresh scope and publishes atomically.
+Feature definitions support primitives, profiles, sweeps, fillets, chamfers, hollow/offset/draft,
+local features, holes, defeaturing, healing, transforms, booleans, section, and split. Bezier and
+BSpline curve/surface control geometry may contain expressions for every pole coordinate, with
+rational weights and the supported degree/knot/periodic fields.
+
+Serialized output uses `schemaVersion: 1`; unversioned input is migrated to v1 and unknown future
+versions are rejected. Features may be suppressed; diagnostics report `ok`, `suppressed`, or
+`failed`, and a failed dependency prevents publication of a partial recompute. Face and edge
+references persist geometry-family and parent-normalized-bound signatures. References may follow
+an upstream `source: "id"` through the unique feature-history path; deleted, unmapped, and
+one-to-many results are reported as `missing` or `ambiguous`. Strict matching is the default,
+with explicit `disambiguation: "initialIndex"` and `allowGeometryReplacement` opt-ins for the
+documented cases.
+
+`solveSketch` accepts serializable 2D line, circle, arc, and BSpline entities, construction
+geometry, geometric and dimensional constraints, and an arbitrary 3D sketch plane. It returns
+convergence, residual, iteration, degree-of-freedom, and per-constraint diagnostics. BSpline
+endpoints can participate in point-reference constraints; BSpline tangency is outside the bounded
+v1 solver. Without profiles a sketch result is one wire; ordered profiles produce a compound and
+stable `sketchId.profileId` wire references suitable for face outer and hole inputs.
 
 ## Exchange, cache, and errors
 
-STEP and STL I/O run entirely through memory streams; no filesystem is involved. STEP operations take `unit` (`"mm"` default, or `"cm"`, `"m"`, `"inch"`, `"foot"`), which is the model length unit the kernel's dimensionless coordinates are expressed in. `exportSTEP` writes the file in that same unit, so coordinates round-trip without scaling, and returns `data` with layout `step-utf8`. `importSTEP` converts whatever unit the file declares into the requested model unit and returns `shape` plus `rootCount`. `exportSTEPDocument` accepts an indexed rooted tree of `part` and `assembly` nodes; a child node carries its local `matrix12`, and nodes may carry names, RGBA colors, layers, visibility, and an XCAF physical `material` with name, optional description, non-negative density, and optional density name/value type. Omitted density metadata defaults to `kg/m^3` and `mass density`. Native XCAF persistence retains all material fields; STEP round trips name, description, density, and density name, while the STEP mapping may omit `densityValueType`. Native `exportXCAF`/`importXCAF` preserve `geometricTolerances`, linked `datumIndices`, and `datums` entries in binary and worker-generated XML. XML output is standard XmlXCAF with a validated embedded binary recovery marker; memory import accepts only XML produced by `exportXCAF()`, while third-party XmlXCAF must be converted to XCAF binary before import. XML export rejects node `color`, non-empty `subshapeStyles`, and SHUO `color` so the standard XML portion never silently loses RGBA data; use XCAF binary when these fields are required. `exportSTEPDocument` rejects non-empty `datums` or `geometricTolerances` because the pinned OCCT STEP transfer cannot preserve these standalone XCAF links, and GDT export requires exactly one document root. `importSTEPDocument` returns the same occurrence-tree representation plus a scoped shape for each node and one combined document shape. Native XCAF views additionally preserve named clipping-plane labels with origin, normal, and capping state. The STEP header timestamp is never read from a clock: STEP exporters use the caller's `timestamp` string or the protocol-fixed `2026-01-01T00:00:00`. Exported file bytes stay outside the cross-host byte-determinism scope.
+### Exchange and cache
 
-Native XCAF dimensions, datums, and geometric tolerances may include `presentation: { shape, name? }`. The shape contains the graphical annotation topology stored by OCCT on the DimTol object's OCAF presentation label; imports materialize it as a scoped handle. Binary persistence retains that topology natively, including inside the recovery marker used by worker-generated XML.
+All exchange operations use memory streams; they do not access the filesystem.
 
-IGES shape and XCAF document operations also use memory streams and explicit `unit` values. `exportIGESDocument`/`importIGESDocument` preserve rooted `part`/`assembly` hierarchy, names, RGBA colors, layers, and occurrence transforms through a validated trailing metadata marker because the pinned IGESCAF bridge does not persist all of these labels. IGES cannot preserve `gdt`, `datums`, `geometricTolerances`, `views`, or `shuo`; document export rejects those fields explicitly. Shape-only IGES import/export additionally returns independent roots and `rootCount`.
+#### STEP and XCAF
 
-IGES shape I/O also uses memory streams and accepts the same length units. `exportIGES` supports `mode: "faces"` (default) and `mode: "brep"`; STEP and IGES exporters accept either one `shape` or multiple independent `shapes`. Their importers return OCCT's combined `shape`, one scoped handle per transferred result in `shapes`, and `rootCount`. This IGES path preserves shape geometry only; XCAF names, colors, layers, materials, and assembly relationships are not transferred.
+- STEP `unit` is `"mm"` by default and also accepts `"cm"`, `"m"`, `"inch"`, or `"foot"`. It defines the model length represented by the kernel's dimensionless coordinates.
+- `exportSTEP` writes coordinates in the selected unit and returns `data` with layout `step-utf8`. `importSTEP` converts the file's declared unit into the requested model unit and returns `shape` plus `rootCount`.
+- `exportSTEPDocument` accepts an indexed tree of `part` and `assembly` nodes. Child nodes carry local `matrix12` transforms; nodes can carry names, RGBA colors, layers, visibility, physical material metadata, and validation properties.
+- Material density must be non-negative. Omitted density metadata defaults to `kg/m^3` and `mass density`. Native XCAF retains every material field; STEP can omit `densityValueType`.
+- Native `exportXCAF` and `importXCAF` preserve datums, linked geometric tolerances, and graphical presentations in binary and worker-generated XML.
+- Worker-generated XML is standard XmlXCAF with a validated binary recovery marker. Memory import accepts only XML produced by `exportXCAF()`; convert third-party XmlXCAF to XCAF binary before import.
+- XML export rejects node `color`, non-empty `subshapeStyles`, and SHUO `color`; use XCAF binary when those RGBA fields are required.
+- `exportSTEPDocument` rejects datum and geometric-tolerance links that the pinned STEP transfer cannot preserve. GDT export requires exactly one document root.
+- `importSTEPDocument` returns the occurrence tree, a scoped shape for each node, and one combined document shape. Native XCAF views also preserve named clipping-plane labels with origin, normal, and capping state.
+- STEP exporters use the caller's `timestamp` or the protocol default; they do not read the clock. Exported bytes are outside the cross-host byte-determinism scope.
 
-OBJ supports vertex records, positive or negative position/UV/normal indices, seam expansion, slash-separated corner fields, and polygon fan triangulation. The default `importOBJ` result remains shape-only and retains complete normals and UVs in imported face triangulations. With `includeDocument: true`, the result additionally contains indexed position/index buffers, optional complete normal/UV buffers, and a document. Its primitive ranges preserve contiguous `o`, `g`, `usemtl`, and `s` state; `indexStart` and `indexCount` address scalar entries in the returned index buffer. `materialLibraries` preserves every `mtllib` reference. Optional `resources` entries pair a URI with a protocol input buffer; matching MTL resources populate material ambient/diffuse/specular/emissive colors, opacity (`d` or inverse `Tr`), shininess, optical density, illumination model, and diffuse/specular/opacity/bump map references. An absent companion resource does not prevent geometry import or remove its library reference. The mesh form of `exportOBJ` accepts indexed buffers and optional document metadata, requires supplied primitive ranges to partition the index buffer, and returns OBJ data plus caller-named companion MTL resources; the shape-only overload remains available. PLY imports ASCII, binary little-endian, and binary big-endian 1.0 vertex positions and polygonal faces, and exports all three encodings. The default PLY shape path retains vertex normals and common UV properties (`s/t`, `u/v`, or `texture_u/texture_v`) in face triangulations. With `includeMesh: true`, PLY also returns indexed positions, indices, normals, UVs, u8 RGBA vertex colors, and ordered `comment`/`obj_info` header metadata; `exportPLY` accepts that indexed mesh directly, including colors and metadata, without shape conversion, and rejects out-of-range, repeated-index, and geometrically degenerate triangles. glTF operations support glTF 2.0 JSON and binary GLB, data-URI or URI-matched companion buffers, triangle list/strip/fan primitives, scene node matrices or TRS, normalized or float `NORMAL`/`TEXCOORD_0` attributes, sparse accessors, `POSITION`/`NORMAL` morph target evaluation, four-influence skin deformation, selected-animation sampling, and deterministic conversion between OCCT Z-up and glTF Y-up coordinates. `animationIndex` and `animationTime` must either both be absent or both be present; the zero-based index selects an animation and the time samples it in seconds. Its node `translation`, `rotation`, `scale`, and `weights` channels are sampled with `STEP`, `LINEAR`, or `CUBICSPLINE` interpolation before active-scene world transforms, morph evaluation, and skinning. Linear rotations use normalized shortest-path quaternion interpolation, and sample times outside the key range clamp to its endpoints. Invalid animation, sampler, accessor, channel, target, interpolation, count, and finite-value constraints are rejected. Explicit import `morphWeights` override sampled node weights, which override static node weights and then mesh weights; skinning uses `JOINTS_0`, `WEIGHTS_0`, joint world transforms, and optional inverse bind matrices after morph evaluation. The default `importGLTF` result remains shape-only. With `includeDocument: true`, it returns the complete unmodified source JSON, the active scene and roots, evaluated Z-up scene buffers, per-instance primitive ranges, resolved buffers, resolved external/data-URI images, and an optional shape. Its symmetric `exportGLTF` document form accepts the returned source document and resolved data, preserves standard document metadata, writes external buffers and images as explicit companion resources for JSON, and folds all buffers into the GLB BIN chunk while keeping external images as resources. Materials, textures, samplers, animations, skins, cameras, extensions, and extras remain in their standard glTF JSON form. Unknown required geometry extensions are rejected. These mesh imports produce valid triangle-face TopoDS compounds rather than recovering analytic surfaces.
+Native XCAF dimensions, datums, and geometric tolerances can include `presentation: { shape, name? }`. The shape is the graphical annotation topology stored on the OCAF presentation label. Imports return it as a scope-owned handle. Binary persistence retains that topology, including in the recovery marker used by worker-generated XML.
 
-VRML 1/2 import and export use memory streams and preserve the existing shape-only API by default. `importVRML` with `includeMesh: true` additionally returns indexed positions, triangle indices, normals, optional UVs, and optional u8 RGBA vertex colors from the OCCT scene. `exportVRML` also accepts indexed `positions`/`indices` mesh buffers with optional normals, UVs, and opaque u8 RGBA colors; VRML stores RGB only. Shape-based export keeps the tessellation options.
+#### IGES
 
-`exportPLY` accepts `encoding: "ascii"`, `"binary_little_endian"`, or `"binary_big_endian"`; all three outputs are readable by the corresponding `importPLY` path.
+- IGES shape and XCAF document operations use the same explicit length units as STEP.
+- `exportIGESDocument` and `importIGESDocument` preserve rooted `part`/`assembly` hierarchy, names, RGBA colors, layers, and occurrence transforms through a validated metadata marker.
+- IGES cannot preserve `gdt`, `datums`, `geometricTolerances`, `views`, or `shuo`; document export rejects those fields.
+- `exportIGES` accepts `mode: "faces"` (default) or `mode: "brep"`.
+- STEP and IGES shape exporters accept one `shape` or multiple independent `shapes`. Import returns OCCT's combined `shape`, one scope-owned handle per transferred result in `shapes`, and `rootCount`.
+- Shape-only IGES transfers geometry, not XCAF names, colors, layers, materials, or assembly relationships.
 
-BREP is a cache format bound to the exact wasm artifact SHA-256, not a cross-version exchange format. The kernel intentionally emits bare BREP bytes and does not embed or validate that hash. Callers must store the hash from `docs/g0-build.json` with each cache entry and reject mismatches before calling `importBREP`.
+#### STL
 
-Fillet and chamfer edge selection uses zero-based `edgeIndices` from the input shape's stable edge map. Both operations retain a scalar size for compatibility and accept an aligned per-edge `radii` or `distances` array. Fillet `radius2` defines linear start/end evolution; `radiusLaw` or aligned `radiusLaws` define multipoint OCCT evolution laws with strictly increasing relative parameters spanning 0 through 1. Chamfer two-distance mode accepts scalar `distance2` or aligned `distances2` together with aligned `referenceFaceIndices`; each reference face must be adjacent to the corresponding edge and identifies the side for the first distance. Fillet supports analytic and B-spline faces; algorithmic failures are returned as `FilletFailed`. `history` remains a local single-operation mapping. Full mappings are available for booleans, cylindrical holes, defeaturing, extrusion, revolution, loft, pipe sweeps, pipe-shell spine/profile inputs, fillet/chamfer, sewing, shape repair, same-domain unification, and the rigid/scale/mirror/general-affine transform family. An auxiliary pipe-shell spine has no OCCT history mapping, so `sweepPipeShell` is classified as `partial`. Fillet/chamfer history reports retained subshapes, OCCT-generated faces from input edges, modified replacement faces, and deleted inputs; generated and deleted classifications may both refer to an input edge. Operations without a reliable history source are explicitly reported as `unsupported` by `capabilities`; requesting `includeHistory: true` for one of those operations returns `InvalidArgs`.
+- `exportSTL` accepts `encoding: "binary" | "ascii"`; binary is the default. ASCII output accepts a printable `solidName`, while binary output accepts an exact 80-byte `binaryHeader`.
+- Shape export accepts `relative` to interpret `linearDeflection` relative to shape size. The indexed-mesh overload writes supplied triangles directly and ignores tessellation options.
+- With `includeMesh: true`, import also returns per-facet normals and the matching name or header metadata. Imported STL becomes a triangulated TopoDS compound and does not recover analytic CAD surfaces.
+
+#### OBJ
+
+- OBJ accepts positive and negative position/UV/normal indices, independent slash-separated corner fields, seam expansion, and polygon fan triangulation.
+- The default `importOBJ` result is shape-only and retains complete normals and UVs in face triangulations.
+- With `includeDocument: true`, import also returns indexed buffers and a document. Primitive ranges preserve contiguous `o`, `g`, `usemtl`, and `s` state; `indexStart` and `indexCount` count scalar index entries. `materialLibraries` preserves every `mtllib` reference.
+- Matching MTL `resources` populate ambient, diffuse, specular, and emissive colors; opacity; shininess; optical density; illumination model; and supported map references. A missing companion resource does not block geometry import or remove its library reference.
+- Mesh `exportOBJ` accepts indexed buffers and document metadata, requires primitive ranges to partition the index buffer, and returns OBJ data plus named MTL resources. The shape-only overload remains available.
+
+#### PLY
+
+- PLY 1.0 import and export support ASCII, binary little-endian, and binary big-endian encodings.
+- The shape path retains vertex normals and common UV properties: `s/t`, `u/v`, and `texture_u/texture_v`.
+- With `includeMesh: true`, import also returns indexed positions, indices, normals, UVs, u8 RGBA vertex colors, and ordered `comment`/`obj_info` headers.
+- `exportPLY` accepts ASCII, binary little-endian, and binary big-endian encoding. It writes the indexed mesh directly, rejects out-of-range or repeated indices and geometrically degenerate triangles, and produces output readable by the matching `importPLY` path.
+
+#### glTF and GLB
+
+- glTF operations support glTF 2.0 JSON and GLB; data-URI and URI-matched buffers; triangle lists, strips, and fans; node matrices or TRS; normalized or float `NORMAL`/`TEXCOORD_0`; sparse accessors; morph targets; four-influence skinning; animation sampling; and OCCT Z-up/glTF Y-up conversion.
+- `animationIndex` and `animationTime` must be supplied together. Node `translation`, `rotation`, `scale`, and `weights` use `STEP`, `LINEAR`, or `CUBICSPLINE` interpolation before world transforms, morph evaluation, and skinning. Linear rotation uses normalized shortest-path quaternion interpolation; times outside the key range clamp to its endpoints.
+- Invalid animation, sampler, accessor, channel, target, interpolation, count, and finite-value constraints are rejected.
+- Explicit `morphWeights` override sampled node weights, which override static node weights and then mesh weights. Skinning uses `JOINTS_0`, `WEIGHTS_0`, joint world transforms, and optional inverse bind matrices after morph evaluation.
+- The default `importGLTF` result is shape-only. With `includeDocument: true`, it also returns the unmodified source JSON, active scene and roots, evaluated Z-up buffers, primitive-instance ranges, resolved buffers and images, and an optional shape.
+- Document export preserves standard metadata. JSON uses companion resources for external buffers and images; GLB folds buffers into the BIN chunk and keeps external images as resources.
+- The TypeScript import boundary decodes `KHR_draco_mesh_compression` and `EXT_meshopt_compression` before kernel import. Document imports retain the original compressed JSON and source buffers.
+- Unknown required geometry extensions are rejected. Mesh imports produce triangle-face TopoDS compounds; they do not recover analytic surfaces.
+
+#### VRML
+
+- VRML 1/2 import and export use memory streams and preserve the shape-only API by default.
+- With `includeMesh: true`, `importVRML` also returns indexed positions, triangle indices, normals, optional UVs, and optional u8 RGBA vertex colors from the OCCT scene.
+- `exportVRML` accepts the same indexed mesh attributes, but RGBA colors must be opaque because VRML stores RGB only. Shape export retains the tessellation options.
+
+#### BREP cache
+
+- BREP is a cache format bound to the exact running WASM identity, not a cross-version exchange format. The kernel emits bare BREP bytes and neither embeds nor validates that identity.
+- For the official standalone runtime, store the SHA-256 from `docs/g0-build.json` with each cache entry.
+- For an official isolated Profile, use its artifact SHA-256 from [`protocol/artifacts.json`](../protocol/artifacts.json).
+- For the official shared runtime, the identity contains the SHA-256 values of both `shared-main.wasm` and `step-shape-exchange.side.wasm` from the same manifest.
+- Reject an identity mismatch before calling `importBREP`.
+
+### Operation-specific constraints
+
+#### Fillet and chamfer
+
+- Edge selection uses zero-based `edgeIndices` from the input shape's stable edge map. Both operations retain a scalar size for compatibility and accept aligned per-edge `radii` or `distances` arrays.
+- Fillet `radius2` defines linear start/end evolution. `radiusLaw` or aligned `radiusLaws` define multipoint radius changes with strictly increasing relative parameters spanning 0 through 1.
+- Chamfer two-distance mode accepts scalar `distance2` or aligned `distances2` together with aligned `referenceFaceIndices`. Each reference face must be adjacent to its edge and identifies the side for the first distance.
+- Fillet supports analytic and BSpline faces. Algorithm failures return `FilletFailed`.
+
+#### Operation history
+
+- `history` is a local mapping for one operation. It is not persistent topological naming.
+- Full mappings are available for booleans, cylindrical holes, defeaturing, extrusion, revolution, loft, pipe sweeps, pipe-shell spine/profile inputs, fillet/chamfer, sewing, shape repair, same-domain unification, and rigid, scale, mirror, and general affine transforms.
+- An auxiliary pipe-shell spine has no OCCT history mapping, so `sweepPipeShell` is `partial`.
+- Fillet/chamfer history reports retained subshapes, faces generated by OCCT from input edges, modified replacement faces, and deleted inputs. Generated and deleted classifications can both refer to one input edge.
+- `capabilities` reports operations without a reliable history source as `unsupported`. Requesting `includeHistory: true` for one of those operations returns `InvalidArgs`.
+
+#### Holes and defeaturing
 
 `cylindricalHole` uses an explicit axis and supports `throughAll`, `throughNext`, `untilEnd`, `blind`, and `between` limits. Blind `length` and between `from`/`to` are axis parameters measured from `origin` in model units. `defeature` accepts zero-based face indices on a solid, compsolid, or compound of solids. Both operations provide full local face/edge history; this remains single-operation history rather than persistent naming.
 
-`editCurveBSpline` and `editSurfaceBSpline` expose native knot insertion/removal, degree elevation, periodicity and control-net edits. `reduceCurveDegree` and `reduceSurfaceDegree` perform bounded OCCT BSpline approximation to lower requested degrees, return the new shape plus OCCT's `maxError`, and preserve the source parameter domain and surface boundary topology. `triangulationData` reads an existing face mesh without retessellation; `validateTriangulation` checks the documented finite-attribute, index, and degeneracy invariants; `replaceTriangulation` returns an independent face copy with caller-supplied positions, indices, normals, and UVs; `repairTriangulation` copies and remeshes an arbitrary shape with OCCT BRepMesh and computes normals on the rebuilt faces.
+#### BSpline and triangulation editing
+
+- `editCurveBSpline` and `editSurfaceBSpline` expose native knot insertion/removal, degree elevation, periodicity, and control-net edits.
+- `reduceCurveDegree` and `reduceSurfaceDegree` perform bounded OCCT BSpline approximation, return the new shape plus OCCT's `maxError`, and preserve the source parameter domain and surface boundary topology.
+- `triangulationData` reads an existing face mesh without retessellation. `validateTriangulation` checks the documented finite-attribute, index, and degeneracy invariants.
+- `replaceTriangulation` returns an independent face copy with caller-supplied positions, indices, normals, and UVs. `repairTriangulation` copies and remeshes a shape with OCCT BRepMesh and computes normals on the rebuilt faces.
+
+#### Surface filling
 
 `makeSurfaceFilling.constraints` uses zero-based boundary edge indices in wire order and face handles for `g1` or `g2` support-face constraints. Unspecified edges use C0, and the support face must contain an OCCT pcurve for the constrained edge.
 
-`localPrism` defaults to `length` mode. The `until`, `fromUntil`, `untilEnd`, `fromEnd`, and `thruAll` modes map directly to the corresponding `BRepFeat_MakePrism` limit operations; `until` and `from` are scoped limiting shape handles.
+#### Local features
 
-`localRevolution` uses selected base faces and an explicit axis. Its `angle`, `until`, `fromUntil`, and `thruAll` modes map directly to `BRepFeat_MakeRevol`; positive or negative angle values are accepted within one full revolution. `linearForm` maps to `BRepFeat_MakeLinearForm` and creates a planar rib or slot from a profile wire, work plane, and one or two opposing thickness vectors. `direction1` is either zero or opposite to `direction`; `operation` selects fusion (`add`) or cutting (`cut`). The native linear form has no length/until limit mode.
+- `localPrism` defaults to `length` mode. The `until`, `fromUntil`, `untilEnd`, `fromEnd`, and `thruAll` modes map directly to the corresponding `BRepFeat_MakePrism` limit operations; `until` and `from` are scoped limiting shape handles.
+- `localRevolution` uses selected base faces and an explicit axis. Its `angle`, `until`, `fromUntil`, and `thruAll` modes map directly to `BRepFeat_MakeRevol`; positive or negative angle values are accepted within one full revolution.
+- `linearForm` maps to `BRepFeat_MakeLinearForm` and creates a planar rib or slot from a profile wire, work plane, and one or two opposing thickness vectors. `direction1` is either zero or opposite to `direction`; `operation` selects fusion (`add`) or cutting (`cut`). The native linear form has no length/until limit mode.
+- `revolutionForm` provides `BRepFeat_MakeRevolutionForm` rotational rib/slot construction. It takes a profile wire, plane, revolution axis, and non-negative `height1`/`height2`; at least one height must be non-zero. It has no limit-shape mode.
+- `glue` provides explicit `BRepFeat_Gluer` imprinting. `faceBindings` pair zero-based face indices from `newShape` and `baseShape`; optional `edgeBindings` pair zero-based edge indices. At least one face binding is required. OCCT also matches bound-face edges when possible.
 
-`exportSTL` accepts `encoding: "binary" | "ascii"` (binary is the default) and routes the generated triangulation through the corresponding OCCT `RWStl` writer. ASCII export accepts a printable `solidName`; binary export accepts an exact 80-byte `binaryHeader`. Opt-in mesh import returns the matching metadata for lossless re-export.
+### Errors and cancellation
 
-`revolutionForm` provides the corresponding `BRepFeat_MakeRevolutionForm` rotational rib/slot construction. It takes a profile wire, plane, revolution axis, and non-negative `height1`/`height2` values; at least one height must be non-zero. It has no limit-shape mode. `glue` provides explicit `BRepFeat_Gluer` imprinting: `faceBindings` pair zero-based face indices from `newShape` and `baseShape`, and optional `edgeBindings` pair zero-based edge indices. At least one face binding is required; bound-face edges are also matched by OCCT when possible.
-
-Compressed glTF geometry is decoded at the TypeScript import boundary: `KHR_draco_mesh_compression` and `EXT_meshopt_compression` are normalized before kernel import, while document imports retain the original compressed JSON and source buffers.
-VRML, STL, OBJ, PLY, and glTF import/export plus edge tessellation report normalized progress; mesh exchange cancellation is acknowledged at parser, serialization, and buffer-materialization phase boundaries. Only operations listed by the host adapter as cooperative cancellation operations may observe an `AbortSignal` after dispatch.
+- VRML, STL, OBJ, PLY, and glTF import/export plus edge tessellation report normalized progress.
+- Mesh exchange checks cancellation while parsing, serializing, and copying output buffers.
+- Only operations listed by the host adapter as cooperatively cancellable may observe an `AbortSignal` after dispatch.

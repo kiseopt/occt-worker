@@ -10,9 +10,9 @@ TypeScript 客户端。
 [![Node.js](https://img.shields.io/node/v/occt-worker.svg)](https://www.npmjs.com/package/occt-worker)
 [![许可证](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE-APACHE-2.0.txt)
 
-[English README](README.md) · [文档导航](docs/README.md) · [使用指南](docs/getting-started.zh-CN.md) · [API 参考](docs/api.zh-CN.md) · [能力矩阵](docs/capabilities.zh-CN.md)
+[English README](README.md) · [文档导航](docs/README.md) · [使用指南](docs/getting-started.zh-CN.md) · [架构](docs/architecture.zh-CN.md) · [API 参考](docs/api.zh-CN.md) · [能力矩阵](docs/capabilities.zh-CN.md)
 
-**当前版本：** `v1.2.0` · **运行时：** Node.js `>=20` · **许可证：** 项目代码采用
+**运行时：** Node.js `>=20` · **许可证：** 项目代码采用
 Apache-2.0；OCCT 和其他第三方组件请以分发通知为准。
 
 本项目独立开发，与 Open Cascade SAS 无关联、未获其背书或赞助，也不使用 Open
@@ -88,13 +88,53 @@ await scope.end();
 | 参数化特征和草图 | `ParametricModel` 与特征定义 | [TypeScript API](docs/api.zh-CN.md) |
 | shared Main/Side 高层兼容 | `SharedClient` + `EngineCompatClient` | [TypeScript API](docs/api.zh-CN.md) |
 
-使用 isolated Profile 时，从 `protocol/artifacts.json` 读取 descriptor，并向
-`createWorkerProfileRuntime` 提供 Worker 工厂；该 helper 会在启动 Worker 前校验产物，随后
-把返回的 factory 注册到 `GeometryEngine`，以便按首次使用懒启动 Profile。shared Side/Profile
-二进制不在 npm tarball 中，而是在版本 tag 的 GitHub Release 中由 release workflow 自动构建并上传；
-`protocol/artifacts.json` 同步记录对应版本 URL 和 SHA-256。使用 `SharedClient` 时传入 Main/Side
-构件即可通过旧的 `BaseClient`/`EngineCompatClient` 调用面运行；私有部署仍可配置 `baseUrl`、
-`defaultBase` 或 `resolve`，不需要项目手工维护 CDN。
+## 选择运行时
+
+| 目标 | 选择 | 主要边界 |
+| --- | --- | --- |
+| 用最少配置运行完整内核 | Standalone full：进程内使用 `DirectClient`，不阻塞主线程时使用 `WorkerClient` | 每个客户端加载一个完整产物，并拥有本地 handle arena |
+| 按需加载能力，同时保留原生 shape identity | Shared Main/Side：`SharedClient` | Main 与所有已加载 Side 共享 memory、allocator 和 shape handle；Side 在该 Main epoch 内常驻 |
+| 在独立 Worker 中运行一个固定能力集合 | Isolated Profile：`createProfileClient` | 只启动该 Profile，其 handle 不能用于其他运行时 |
+| 在多个隔离能力集合之间路由工作 | 使用 `GeometryEngine` 注册 `createWorkerProfileRuntime` factory | 跨 Profile 使用会克隆 BREP placement，不会迁移原生 shape handle |
+| 在互斥的 preview 与 full 模式之间切换 | 使用 isolated Profile factory 的 `SingleRuntimeSession` | 替代运行时启动前先关闭旧运行时 |
+| 嵌入 Wasmtime 或其他自定义宿主 | 同步 WebAssembly ABI | 宿主提供 imports，并遵循消息 ABI |
+
+Profile 描述能力集合，运行形式描述加载与所有权。组合多个 Profile 或跨运行时保留 shape 前，
+请先阅读[运行时架构](docs/architecture.zh-CN.md)。
+
+## 运行时分层
+
+能力组织、二进制边界和运行时实例是相互独立的层：
+
+```text
+operation -> semantic module -> implementation unit -> Profile -> artifact -> runtime instance
+```
+
+Operation 是公开协议命令；语义模块归类相关能力；实现单元定义链接所需的源码、toolkit 和
+依赖闭包；Profile 选择经过测试的实现单元集合；artifact 是运行时实例实际加载的文件。
+因此，Profile 不只是“更小的 WASM”，各 Profile 也不构成一条严格按体积递增的层级链。
+
+`preview` 是最小的正式查看 Profile，`core-modeling` 是最小的正式建模 Profile。
+`full-profile` 表示在一个 isolated Profile 运行时中提供完整能力；它不同于 standalone full
+产物，也不同于加载全部所需 Side 后的 shared Main 运行时。
+
+运行形式分为 standalone full、shared Main/Side 和 isolated Profile。它们共享 operation
+契约，但加载、内存与句柄所有权、清理方式和失败范围不同。完整契约见
+[运行时与 WASM 架构](docs/architecture.zh-CN.md)，精确的 Profile 到 operation 映射见生成的
+[Profile 能力表](docs/profile-capabilities.generated.zh-CN.md)。
+
+## 使用 Three.js 可视化
+
+`occt-worker` 有意不内置可视化。该包负责 CAD 几何、拓扑、交换和三角化；推荐使用
+[Three.js](https://threejs.org/) 负责场景图、相机、材质、灯光、控制和渲染。分离这两类职责
+可以避免 CAD 内核及其 Worker 生命周期与某一种图形栈耦合，也让同一个内核可用于 Node.js、
+无界面处理流程以及采用其他渲染器的应用。
+
+`tessellate()` 返回与渲染器无关的 `positions`、`normals`、`indices`、可选 `uvs` 和
+`faceGroups`。这些 typed array 可直接用于
+[`THREE.BufferGeometry`](https://threejs.org/docs/#api/en/core/BufferGeometry)；需要从渲染
+triangle 映射回 OCCT face index 进行选择时，应保留 `faceGroups`。Three.js 是推荐的
+可视化方案，但不是本包依赖。
 
 ## 支持矩阵
 
@@ -106,20 +146,21 @@ await scope.end();
 | Wasmtime | 使用独立的 `wasm/occt-worker.wasmtime.wasm`；CI 使用 Wasmtime 47.0.3 |
 | 共享内存 | `SharedArrayBuffer` 能力要求浏览器启用跨源隔离 |
 | 移动浏览器和 WebView | 不属于发布认证矩阵 |
-| 可视化和并行 OCCT toolkit | 可视化、pthread/TBB 执行和通用 OCAF 编辑不属于 v1 |
-| BREP | 仅作缓存格式；每个缓存必须绑定 `docs/g0-build.json` 中的精确 wasm SHA-256 |
+| 可视化 | 输出与渲染器无关的三角化数据；使用 Three.js 或其他渲染器 |
+| 并行 OCCT toolkit 和通用 OCAF 编辑 | pthread/TBB 执行和通用 OCAF 编辑不属于 v1 |
+| BREP | 仅作缓存格式；每个缓存必须绑定协议定义的精确运行中 WASM 身份 |
 
 完整操作集、默认值、缓冲区布局、取消规则和宿主细节见[协议规范](docs/protocol.zh-CN.md)、
 [能力矩阵](docs/capabilities.zh-CN.md)和[宿主支持](docs/hosts.zh-CN.md)。
 
 ## 已知问题与限制
 
-- 通过 `WorkerClient` 取消正在执行的同步操作会触发硬恢复：Worker 被重建，旧 Worker
-  拥有的所有句柄都会失效。
+- 可协作取消的操作会保留 `WorkerClient`、其句柄和排队调用。取消其他正在执行的同步操作
+  会重建 Worker 并使其句柄失效。
 - `SharedArrayBuffer` 传输仍需在 WebAssembly 线性内存和宿主内存之间复制一次，并非零拷贝。
 - BREP 是缓存格式，不是可移植交换格式。运行中的 wasm SHA-256 与记录值不一致时必须拒绝缓存。
 - 移动浏览器和 WebView（包括其内存上限）不属于发布测试矩阵。
-- 可视化、pthread/TBB 执行和通用 OCAF 编辑不属于 v1 API。
+- pthread/TBB 执行和通用 OCAF 编辑不属于 v1 API。
 - STEP/IGES/XCAF 元数据支持遵循各格式的文档化子集；格式无法保存的数据会被拒绝，或按文档化
   扩展路径表示。
 
@@ -161,6 +202,7 @@ Release 构建、协议生成文件和 wasm 哈希由仓库脚本及 CI 校验�
 
 - [文档导航](docs/README.md)
 - [使用指南](docs/getting-started.zh-CN.md)
+- [运行时与 WASM 架构](docs/architecture.zh-CN.md)
 - [TypeScript API](docs/api.zh-CN.md)
 - [协议规范](docs/protocol.zh-CN.md)
 - [能力矩阵](docs/capabilities.zh-CN.md)

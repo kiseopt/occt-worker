@@ -1,7 +1,7 @@
 # 内存上限真机测试
 
 1. 通过 HTTP 服务打开 `tests/device/`，填写设备型号、系统版本和浏览器。
-2. 选择 `preview` 或 `full`，点击“开始二分测试”。典型负载完成后，测试会增长 wasm 线性内存，并每隔 4 KiB 写入后读回一个字节以确认页面被触碰。
+2. 选择一个 `preview` 或 `full` 候选，点击“开始候选测试”。典型负载完成后，测试会增长 wasm 线性内存，并每隔 4 KiB 写入后读回一个字节以确认页面被触碰。
 3. 低于 4096 MiB 的候选若显示 `candidate-declared-maximum`，只表示到达该 wasm 文件声明的 maximum；4096 MiB 若显示 `wasm32-address-space-maximum`，表示到达 wasm32 的 65536 页固有上限。两者都不是设备物理内存上限。
 4. 若在声明容量之前显示 `runtime-allocation-limit`，只表示浏览器/运行时提前拒绝增长；若出现白屏、网页重载或 `incomplete`，只记录为本次尝试未完成。不要把这些结果换算成设备内存数字。
 

@@ -1,4 +1,4 @@
-// Stage-7 artifact resolver.
+// Artifact resolver for shared Side and isolated Profile WASM.
 //
 // Side/Profile WASM artifacts are not bundled with the npm package; they are
 // fetched from a Release/CDN location determined by, in priority order:

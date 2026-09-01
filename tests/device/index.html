@@ -259,7 +259,7 @@
       </section>
 
       <section class="limit-test" aria-labelledby="limit-title">
-        <h2 id="limit-title">内存上限二分测试</h2>
+        <h2 id="limit-title">内存候选容量测试</h2>
         <div class="limit-controls">
           <label>
             候选产物
@@ -284,13 +284,13 @@
               <option value="full:768">full / 768 MiB</option>
             </select>
           </label>
-          <button id="run-limit-test" type="button">开始二分测试</button>
+          <button id="run-limit-test" type="button">开始候选测试</button>
         </div>
         <p class="measurement-note">此项测的是 wasm 线性内存容量。容量达到 4096 MiB 时是 wasm32 地址空间上限；它不是设备物理内存读数。</p>
         <p id="limit-status" data-state="idle">等待测试</p>
         <div class="report-actions">
-          <h2>二分结果</h2>
-          <button id="copy-limit-results" type="button" class="secondary" disabled>复制二分结果</button>
+          <h2>候选测试结果</h2>
+          <button id="copy-limit-results" type="button" class="secondary" disabled>复制候选结果</button>
         </div>
         <pre id="limit-report">测试完成或页面恢复后生成</pre>
       </section>

@@ -93,7 +93,7 @@ test("protocol contracts and history classifications cover the frozen catalog", 
   assert.equal(PROTOCOL_SEMANTICS.matrix12.order, "row-major 3x4");
   assert.equal(PROTOCOL_SEMANTICS.massProperties.inertiaOrder.join(","), "Ixx,Ixy,Ixz,Iyx,Iyy,Iyz,Izx,Izy,Izz");
   assert.match(PROTOCOL_SEMANTICS.meshGroups.faceGroups, /scalar u32 entries/);
-  assert.match(PROTOCOL_SEMANTICS.brep.callerResponsibility, /wasm SHA-256/);
+  assert.match(PROTOCOL_SEMANTICS.brep.callerResponsibility, /running WASM identity/);
   assert.deepEqual({
     boundary: PROTOCOL_SEMANTICS.defaults["shapeUpgrade.boundaryCriterion"],
     pcurve: PROTOCOL_SEMANTICS.defaults["shapeUpgrade.pcurveCriterion"],

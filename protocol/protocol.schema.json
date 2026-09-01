@@ -15736,8 +15736,8 @@
       "repair": "repairTriangulation copies the input shape, cleans its mesh, and rebuilds face triangulations with OCCT BRepMesh without changing the input handle."
     },
     "brep": {
-      "compatibility": "BREP bytes are a cache format bound to the exact wasm artifact SHA-256, not a cross-version exchange format.",
-      "callerResponsibility": "Persist the wasm SHA-256 from docs/g0-build.json with every BREP cache entry and reject import when it differs from the running artifact. The kernel does not embed or validate this hash."
+      "compatibility": "BREP bytes are a cache format bound to the exact running WASM identity, not a cross-version exchange format.",
+      "callerResponsibility": "Persist the exact running WASM identity with every BREP cache entry and reject mismatches before import. For the official standalone runtime, use the SHA-256 in docs/g0-build.json; for an official isolated Profile, use its artifact SHA-256 in protocol/artifacts.json; for the official shared runtime, use the SHA-256 values of shared-main.wasm and step-shape-exchange.side.wasm from protocol/artifacts.json. The kernel does not embed or validate this identity."
     },
     "defaults": {
       "approximateCurveBSpline.parameterization": "chordLength",

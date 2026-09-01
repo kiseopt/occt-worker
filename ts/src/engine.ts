@@ -5,10 +5,10 @@ import { BUILD_IDENTITY } from "./build-identity.generated.js";
 import { RUNTIME_CONFIG } from "./runtime-manifest.generated.js";
 import type { ModulesManifest } from "./runtime-config.js";
 
-// occt-worker geometry engine (stage 5): isolated profiles, shape placement,
+// Isolated-profile geometry engine: shape placement,
 // clone-based cross-profile transfer, and manifest-driven routing.
 //
-// Design contract (tmp-docs/wasm-implementation-runbook.zh-CN.md §8):
+// Runtime contract (docs/architecture.md):
 //   - every Profile is an independent runtime (static WASM + Worker in
 //     production); it is created lazily on first use and never proactively.
 //   - a logical shape may own several placements across profiles; cloning

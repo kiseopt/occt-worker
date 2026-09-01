@@ -1,4 +1,4 @@
-# occt-worker reproducible build image (stage 7).
+# occt-worker reproducible build image.
 #
 # Toolchain and source identities come from protocol/artifacts.json. CMake,
 # Ninja, and Node remain image bootstrap inputs below.

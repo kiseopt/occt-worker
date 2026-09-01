@@ -1,6 +1,6 @@
 // occt-worker kernel context: shared types, arenas, buffers, protocol ABI.
-// Produced by the stage-3 runbook transformation of kernel/src/kernel.cpp;
-// retained fragments are byte-identical to the originals.
+// Split from kernel/src/kernel.cpp so standalone, shared, and Profile builds
+// use the same declarations.
 #pragma once
 #include "generated.hpp"
 
@@ -268,4 +268,3 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-

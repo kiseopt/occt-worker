@@ -5,7 +5,8 @@
 This page covers first use and common workflows: choosing a runtime entry point,
 running the published kernel, building from source, understanding the boundary of
 generated code, and handling common errors. Complete API parameters and protocol
-fields belong in the [TypeScript API](api.md).
+fields belong in the [TypeScript API](api.md). Runtime composition, Profile boundaries,
+and shape and memory ownership are defined in the [architecture](architecture.md).
 
 ## Choose a runtime
 
@@ -19,21 +20,21 @@ fields belong in the [TypeScript API](api.md).
 
 To verify that the project works without rebuilding OCCT, run the Node.js example:
 
-~~~
+```
 node examples/node-batch.mjs
-~~~
+```
 
 ## Install and run
 
 Install the published npm package:
 
-~~~
+```
 npm install occt-worker
-~~~
+```
 
 Minimal Node.js program:
 
-~~~js
+```js
 import { readFile } from "node:fs/promises";
 import { DirectClient } from "occt-worker";
 
@@ -47,7 +48,7 @@ const cut = await scope.booleanCut(base, [tool]);
 
 console.log(await kernel.bbox(cut.shape));
 await scope.end();
-~~~
+```
 
 Use the `engines` field in `package.json` as the Node.js version requirement. Shapes
 belong to the scope and client that created them; ending a scope releases its shapes,
@@ -55,16 +56,20 @@ and rebuilding a Worker invalidates its old handles.
 
 ## Use a browser Worker
 
-Use `WorkerClient` with the Worker entry point supplied by the project:
+### In an application using the npm package
 
-~~~js
-import { WorkerClient } from "../../dist/worker-client.js";
+When consuming `occt-worker` in a web application:
 
-const wasm = await (await fetch("../../wasm/occt-worker.wasm")).arrayBuffer();
-const factory = () => new Worker(
-  new URL("../../dist/worker-entry.js", import.meta.url),
-  { type: "module" },
-);
+```js
+import { WorkerClient } from "occt-worker";
+
+// Fetch the release WASM binary
+const wasm = await (await fetch("/path/to/occt-worker.wasm")).arrayBuffer();
+
+// Resolve the package and worker subpath through the application's bundler or import map.
+const workerUrl = import.meta.resolve("occt-worker/worker");
+const factory = () => new Worker(workerUrl, { type: "module" });
+
 const kernel = await WorkerClient.create(factory, wasm);
 const scope = await kernel.beginScope();
 const box = await scope.makeBox([10, 20, 30]);
@@ -72,29 +77,39 @@ const box = await scope.makeBox([10, 20, 30]);
 console.log(await kernel.massProps(box));
 await scope.end();
 kernel.close();
-~~~
+```
 
-The browser example is in [`examples/browser`](../examples/browser). Browsers must
-load ES modules, Workers, and WASM over HTTP(S); do not open the HTML directly with
-`file://`. Shared input, shared output, and cooperative cancellation through
-`SharedArrayBuffer` also require cross-origin-isolated response headers. The
-repository browser tests set `Cross-Origin-Opener-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp`.
+> **Repository checkouts and local examples:** Inside this repository (such as [`examples/browser`](../examples/browser)), scripts reference local build artifacts using relative paths such as `../../dist/worker-entry.js` and `../../wasm/occt-worker.wasm`.
 
-Node.js `worker_threads` uses the same `WorkerClient`, but needs a host adapter that
-converts `parentPort` messages to the `WorkerLike` interface. The
-[`tests/ts/node-worker.mjs`](../tests/ts/node-worker.mjs) file is the reference
-adapter; the browser-only `dist/worker-entry.js` is not a Node Worker entry point.
+> **Without an import map:** use a URL emitted by the application's bundler or a server-visible URL to the installed file, such as `/node_modules/occt-worker/dist/worker-entry.js`. The package export is a Node/bundler resolution rule, not a native browser URL resolution rule.
+
+### Browser environment requirements
+
+Browsers must load ES modules, Workers, and WASM over HTTP(S); do not open the HTML directly with `file://`.
+
+Features that rely on `SharedArrayBuffer` (shared input/output buffers and cooperative cancellation) require cross-origin isolation response headers:
+
+```http
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+### Node.js `worker_threads`
+
+Node.js `worker_threads` uses the same `WorkerClient`, but requires a host adapter that bridges Node's `parentPort` messages to the `WorkerLike` interface expected by `WorkerClient`. The browser-only `dist/worker-entry.js` is not a Node Worker entry point. See [Host support](hosts.md) for details on host adapters.
 
 ## Discover available operations
 
-The runtime `capabilities` response is the final authority for the operations the
-loaded kernel actually exposes:
+For standalone and isolated runtimes, the runtime `capabilities` response is the final
+authority for the operations the loaded kernel actually exposes:
 
-~~~js
+```js
 const capabilities = await kernel.initialize();
 console.log(capabilities.ops);
-~~~
+```
+
+`SharedClient.initialize()` instead reports the configured operation surface, including
+operations whose Side module has not loaded yet; the matching Side loads on first dispatch.
 
 Constants such as `OPERATIONS` and `HISTORY_SUPPORT` are generated from the protocol
 and are useful for static typing and routing. Runtime capability decisions must use
@@ -109,37 +124,37 @@ the returned `capabilities` value. The complete operation contract is defined by
 Build from source when changing the kernel, protocol, or TypeScript client. Clone the
 repository with its pinned submodules:
 
-~~~powershell
+```powershell
 git clone --recurse-submodules https://github.com/kiseopt/occt-worker.git
 cd occt-worker
 npm ci
-~~~
+```
 
 For protocol or TypeScript-only changes:
 
-~~~powershell
+```powershell
 npm run build
-~~~
+```
 
 For OCCT C++, kernel handlers, or build-configuration changes:
 
-~~~powershell
+```powershell
 npm run build:wasm
-~~~
+```
 
 The script prepares the pinned CMake, Ninja, and Emscripten SDK versions, builds the
 OCCT static libraries, and then builds the project WASM kernel. For a debug artifact:
 
-~~~powershell
+```powershell
 npm run build:wasm:debug
-~~~
+```
 
 After a build, run checks relevant to the change:
 
-~~~powershell
+```powershell
 npm test
 npm run test:browser
-~~~
+```
 
 The build requires a clean `occt` submodule worktree. Do not edit generated protocol
 files directly; update the authoritative definitions under `protocol/` and run
@@ -183,8 +198,8 @@ already compiled into the kernel.
 
 ## Next reading
 
-- [TypeScript API](api.md): find an entry point and API category.
-- [TypeScript API](api.md): read methods, types, errors, and exchange details.
+- [TypeScript API](api.md): find public entry points, methods, types, errors, and exchange details.
+- [Runtime and WASM architecture](architecture.md): understand layering, Profiles, artifacts, ownership, and lifecycle.
 - [Protocol specification](protocol.md): read frames, handles, buffers, and determinism.
 - [Capability matrix](capabilities.md): see implemented capabilities and explicit limits.
 - [Host support](hosts.md): see browser, Worker, Node.js, and Wasmtime boundaries.

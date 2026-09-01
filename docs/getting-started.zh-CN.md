@@ -4,7 +4,8 @@
 
 本页负责首次使用和常见工作流：选择运行入口、运行已发布内核、从源码构建、
 理解生成代码的边界，以及处理常见错误。API 的完整参数和协议字段不在本页重复；
-请使用 [完整 TypeScript API](api.zh-CN.md)。
+请使用 [完整 TypeScript API](api.zh-CN.md)。运行时组成、Profile 边界以及形状和内存
+所有权由[运行时与 WASM 架构](architecture.zh-CN.md)定义。
 
 ## 先选择运行方式
 
@@ -53,16 +54,20 @@ Node.js 要求以 `package.json` 的 `engines` 字段为准。形状属于创建
 
 ## 使用浏览器 Worker
 
-浏览器使用 `WorkerClient` 和项目提供的 Worker 入口：
+### 在使用 npm 包的应用中
+
+在 Web 前端项目中引入 `occt-worker`：
 
 ```js
-import { WorkerClient } from "../../dist/worker-client.js";
+import { WorkerClient } from "occt-worker";
 
-const wasm = await (await fetch("../../wasm/occt-worker.wasm")).arrayBuffer();
-const factory = () => new Worker(
-  new URL("../../dist/worker-entry.js", import.meta.url),
-  { type: "module" },
-);
+// 获取发布版 WASM 二进制文件
+const wasm = await (await fetch("/path/to/occt-worker.wasm")).arrayBuffer();
+
+// 通过应用的 bundler 或 import map 解析包及其 Worker 子路径。
+const workerUrl = import.meta.resolve("occt-worker/worker");
+const factory = () => new Worker(workerUrl, { type: "module" });
+
 const kernel = await WorkerClient.create(factory, wasm);
 const scope = await kernel.beginScope();
 const box = await scope.makeBox([10, 20, 30]);
@@ -72,25 +77,37 @@ await scope.end();
 kernel.close();
 ```
 
-浏览器示例位于 [`examples/browser`](../examples/browser)。浏览器必须通过 HTTP(S)
-加载 ES 模块、Worker 和 WASM，不能依赖 `file://` 直接打开 HTML。使用
-`SharedArrayBuffer` 的共享输入、共享输出或协作取消时，还需要跨源隔离响应头；仓库
-的浏览器测试会设置 `Cross-Origin-Opener-Policy: same-origin` 和
-`Cross-Origin-Embedder-Policy: require-corp`。
+> **仓库本地运行与示例：** 在本仓库内部（例如 [`examples/browser`](../examples/browser)），代码通过相对路径引用本地构建产物（如 `../../dist/worker-entry.js` 和 `../../wasm/occt-worker.wasm`）。
 
-Node.js `worker_threads` 使用同一个 `WorkerClient`，但需要一个把 `parentPort`
-消息转换为 `WorkerLike` 的宿主适配器。仓库的
-[`tests/ts/node-worker.mjs`](../tests/ts/node-worker.mjs) 是该适配器的参考；
-浏览器专用的 `dist/worker-entry.js` 不能直接作为 Node Worker 入口。
+> **没有 import map 时：** 使用 bundler 输出的 URL，或服务器可访问的已安装文件 URL，例如 `/node_modules/occt-worker/dist/worker-entry.js`。包的 export 是 Node/bundler 解析规则，不是浏览器原生 URL 解析规则。
+
+### 浏览器环境要求
+
+浏览器必须通过 HTTP(S) 加载 ES 模块、Worker 和 WASM，不能依赖 `file://` 直接打开 HTML。
+
+使用 `SharedArrayBuffer` 的功能（共享输入/输出缓冲及协作取消）需要配置跨源隔离响应头：
+
+```http
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+### Node.js `worker_threads`
+
+Node.js `worker_threads` 使用同一个 `WorkerClient`，但需要一个将 `parentPort` 消息桥接为 `WorkerClient` 所需 `WorkerLike` 接口的宿主适配器。浏览器专用的 `dist/worker-entry.js` 不能直接作为 Node Worker 入口。详情参见[宿主支持](hosts.zh-CN.md)。
 
 ## 发现可用操作
 
-运行时的 `capabilities` 响应是当前内核实际公开能力的最终依据：
+对于 standalone 和 isolated 运行时，运行时的 `capabilities` 响应是当前内核实际公开
+能力的最终依据：
 
 ```js
 const capabilities = await kernel.initialize();
 console.log(capabilities.ops);
 ```
+
+`SharedClient.initialize()` 返回的是已配置的操作面，其中包含 Side 模块尚未加载的操作；
+首次派发相应操作时才会加载该 Side。
 
 `OPERATIONS`、`HISTORY_SUPPORT` 等常量由协议定义生成，适合做静态类型和路由；
 运行时能力仍应以 `capabilities` 返回值为准。完整操作契约位于：
@@ -174,8 +191,8 @@ npm run test:browser
 
 ## 下一步阅读
 
-- [完整 TypeScript API](api.zh-CN.md)：按类别查找入口和能力范围。
-- [完整 TypeScript API](api.zh-CN.md)：查看方法、类型、错误和交换格式细节。
+- [完整 TypeScript API](api.zh-CN.md)：查找公开入口、方法、类型、错误和交换格式细节。
+- [运行时与 WASM 架构](architecture.zh-CN.md)：理解分层、Profile、产物、所有权和生命周期。
 - [协议规范](protocol.zh-CN.md)：查看消息帧、句柄、buffer 和确定性规则。
 - [能力矩阵](capabilities.zh-CN.md)：查看已实现能力与明确限制。
 - [宿主支持](hosts.zh-CN.md)：查看浏览器、Worker、Node.js 和 Wasmtime 边界。

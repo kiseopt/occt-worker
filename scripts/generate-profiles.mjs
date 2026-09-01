@@ -206,7 +206,7 @@ const capabilityRows = Object.entries(normalizedProfiles).map(([profileId, profi
   for (const artifact of profile.artifacts) appendUnique(modulesForProfile, artifactModuleCandidates[artifact] ?? []);
   return `| \`${profileId}\` | \`${profile.artifact}\` | ${alias === undefined ? "-" : `\`${alias}\``} | ${modulesForProfile.map((name) => `\`${name}\``).join(", ")} | ${profileOperations[profileId].length} |`;
 });
-const capabilityDoc = `<!-- Generated from protocol/modules.json. Do not edit. -->\n\n# Profile capabilities\n\n[中文说明 / Chinese translation](profile-capabilities.generated.zh-CN.md)\n\nCompile-time capability narrowing applies only to the official profiles below. A custom wasm artifact supplied through the LGPL replacement path can differ from these types, so custom artifacts must be checked with runtime \`capabilities()\`.\n\nType narrowing does not remove methods from the underlying runtime object. Code that bypasses TypeScript can still attempt unsupported calls; the kernel capability check remains the runtime enforcement boundary.\n\n| Profile | Artifact | Alias of | Semantic modules | Operations |\n| --- | --- | --- | --- | ---: |\n${capabilityRows.join("\n")}\n`;
+const capabilityDoc = `<!-- Generated from protocol/modules.json. Do not edit. -->\n\n# Profile capabilities\n\n[中文说明 / Chinese translation](profile-capabilities.generated.zh-CN.md)\n\nFor how Profiles relate to implementation units, artifacts, and runtime instances, see the [runtime architecture](architecture.md).\n\nCompile-time capability narrowing applies only to the official profiles below. A custom wasm artifact passed to \`createWorkerProfileRuntime({ artifact })\` can differ from these types, so custom artifacts must be checked with runtime \`capabilities()\`.\n\nType narrowing does not remove methods from the underlying runtime object. Code that bypasses TypeScript can still attempt unsupported calls; the kernel capability check remains the runtime enforcement boundary.\n\nEvery Profile also includes the runtime operations and the BREP transfer operations used internally by isolated routing. The Semantic modules column lists only the selected non-runtime modules; Operations counts all callable Profile operations, including both common groups.\n\n| Profile | Artifact | Alias of | Semantic modules | Operations |\n| --- | --- | --- | --- | ---: |\n${capabilityRows.join("\n")}\n`;
 const capabilityDocZh = [
   "<!-- Generated from protocol/modules.json. Do not edit. -->",
   "",
@@ -214,9 +214,13 @@ const capabilityDocZh = [
   "",
   "[English reference / 英文规范](profile-capabilities.generated.md)",
   "",
-  "编译期能力收窄只适用于下表由官方定义的 profile。通过 LGPL 替换路径提供的自定义 wasm 产物可能具有不同能力，因此必须用运行时 capabilities() 检查自定义产物。",
+  "Profile 与实现单元、产物和运行时实例的关系见[运行时架构](architecture.zh-CN.md)。",
+  "",
+  "编译期能力收窄只适用于下表由官方定义的 profile。传给 `createWorkerProfileRuntime({ artifact })` 的自定义 wasm 产物可能具有不同能力，因此必须用运行时 `capabilities()` 检查自定义产物。",
   "",
   "类型收窄不会从底层运行时对象移除方法。绕过 TypeScript 的代码仍可能尝试不支持的调用；内核能力检查仍是运行时的强制边界。",
+  "",
+  "每个 Profile 还包含 runtime operation，以及 isolated 路由内部使用的 BREP 迁移 operation。Semantic modules / 语义模块列只列出选定的非 runtime 模块；Operations / 操作的计数包含这两组公共 operation 在内的全部可调用 Profile operation。",
   "",
   "| Profile / Profile | Artifact / 产物 | Alias of / 别名 | Semantic modules / 语义模块 | Operations / 操作 |",
   "| --- | --- | --- | --- | ---: |",

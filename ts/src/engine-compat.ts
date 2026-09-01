@@ -1,7 +1,7 @@
-// Stage-6 compatibility boundary between the stage-5 GeometryEngine and the
-// legacy high-level API (ParametricModel / Sketch / ShapeScope).
+// Compatibility boundary between GeometryEngine and the high-level API
+// (ParametricModel / Sketch / ShapeScope).
 //
-// Rules enforced here (runbook §9):
+// Runtime contract (docs/architecture.md):
 //   - EngineShapeRef never extends the legacy u32 ShapeHandle class.
 //   - Request routing walks nested args recursively and rejects handles from
 //     other backends before any message leaves the caller.
